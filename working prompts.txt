@@ -1,0 +1,13 @@
+you need work until the table does not store any null value until it have the proper reason to store null 
+in this way mention,where null value will be store
+1.tabole name,column name 
+
+you important task : there is should no null values unnessarily
+
+how you need to test:
+1.identify the null value in each table
+2.if found then try to resolve that issue
+3.if null can occur due to any reason that can be avoidable then mention in the format (create md file and mention it reason)
+4.check all tables and stop.
+
+check all the table until it does not contain any null values

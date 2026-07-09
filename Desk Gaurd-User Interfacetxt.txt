@@ -1,0 +1,389 @@
+Complete User Flow
+Login
+   ↓
+Dashboard
+   ↓
+Machine List
+   ↓
+Machine Details
+   ↓
+Investigate Problem
+   ↓
+Take Action
+Total Pages
+1. Dashboard
+2. Machines
+3. Alerts
+4. Reports
+5. Settings
+6. Machine Details (Opened from Dashboard/Machines)
+Sidebar Navigation
+Dashboard
+Machines
+Alerts
+Reports
+Settings
+1. Dashboard Page
+Purpose
+
+Give admin a complete overview within 5 seconds.
+
+URL
+/ dashboard
+Shows
+Top Summary Cards
+Total Machines
+
+Online Machines
+
+Offline Machines
+
+Critical Alerts
+Machine Quick List
+
+Table:
+
+Status	System Name	Mobile Number	Last Seen	Alerts
+
+Example:
+
+🟢 OFFICE-PC-01
+🔴 OFFICE-PC-02
+🟢 LAPTOP-15
+Search Bar
+Search by Mobile Number
+Search by System Name
+User Flow
+Admin opens Dashboard
+        ↓
+Views overall health
+        ↓
+Searches machine
+        ↓
+Clicks machine
+        ↓
+Opens Machine Details Page
+2. Machines Page
+Purpose
+
+Dedicated page to manage and find systems.
+
+URL
+/ machines
+Shows
+
+Search:
+
+Search by:
+
+Mobile Number
+System Name
+
+Filters:
+
+All
+Online
+Offline
+Critical
+
+Machine Table:
+
+| Status | System Name | Mobile | OS | Last Seen | Alerts |
+
+When Clicking Machine
+Open Machine Details Page
+User Flow
+Admin needs a specific machine
+        ↓
+Open Machines Page
+        ↓
+Search
+        ↓
+Click Machine
+        ↓
+Open Details
+3. Alerts Page
+Purpose
+
+Show all problems in one place.
+
+URL
+/ alerts
+Shows
+
+Filter:
+
+Critical
+Warning
+Info
+Resolved
+
+Alert Table:
+
+| Severity | Machine | Mobile | Alert | Time |
+
+Examples:
+
+🔴 CPU Usage >95%
+
+🟡 Antivirus Disabled
+
+🔴 Machine Offline
+
+🟡 USB Connected
+Click Alert
+Open related Machine Details Page
+User Flow
+Admin opens Alerts
+        ↓
+Sees critical issue
+        ↓
+Clicks alert
+        ↓
+Opens machine
+        ↓
+Investigates issue
+4. Reports Page
+Purpose
+
+View historical trends and download reports.
+
+URL
+/ reports
+Shows
+Date Filter
+Today
+Last 7 Days
+Last 30 Days
+Custom
+Charts
+Online vs Offline Trend
+
+Alert Trend
+
+CPU Usage Trend
+
+Device Activity Trend
+Export Options
+PDF
+Excel
+CSV
+User Flow
+Admin wants analysis
+        ↓
+Open Reports
+        ↓
+Select period
+        ↓
+View trends
+        ↓
+Export report
+5. Settings Page
+Purpose
+
+System configuration.
+
+URL
+/ settings
+Sections
+Profile
+Name
+Email
+Password
+Alert Rules
+CPU Threshold
+
+RAM Threshold
+
+Disk Threshold
+
+Example:
+
+CPU Alert >90%
+
+RAM Alert >85%
+Notification Settings
+Email Notifications
+
+SMS Notifications
+User Flow
+Admin wants to change settings
+        ↓
+Open Settings
+        ↓
+Modify values
+        ↓
+Save
+6. Machine Details Page (Most Important)
+
+This page is opened from:
+
+Dashboard
+Machines
+Alerts
+URL
+/ machine/{id}
+Layout
+Section 1 — Header
+
+Always visible.
+
+OFFICE-PC-01
+
+🟢 Online
+
+Mobile Number
+
+Windows Version
+
+Last Seen
+
+Current User
+Section 2 — Health Overview
+
+Visual cards.
+
+CPU Usage
+
+RAM Usage
+
+Disk Usage
+
+Battery
+
+Use:
+
+Circular Progress Indicators
+Section 3 — Active Alerts
+
+Examples:
+
+CPU High
+
+Antivirus Disabled
+
+Machine Offline
+Section 4 — Activity Timeline
+
+Examples:
+
+10:00 USB Connected
+
+10:20 Failed Login
+
+11:00 Printer Connected
+
+11:15 Firewall Disabled
+Detailed Tabs
+Tab 1 — Performance
+
+Shows:
+
+CPU Graph
+
+RAM Graph
+
+Disk Graph
+
+Network Graph
+Tab 2 — Inventory
+
+Shows:
+
+Manufacturer
+
+Model
+
+Processor
+
+RAM
+
+BIOS
+
+Installed Software
+Tab 3 — Security
+
+Shows:
+
+Antivirus
+
+Firewall
+
+Windows Updates
+
+Failed Logins
+Tab 4 — Devices
+
+Shows:
+
+Currently Connected
+Printer
+
+Mouse
+
+Keyboard
+
+Monitor
+Device History
+USB Inserted
+
+Printer Removed
+Tab 5 — Processes
+
+Shows:
+
+Top Running Processes
+
+Example:
+
+| Process | CPU | RAM |
+
+Tab 6 — History
+
+Shows:
+
+Complete monitoring history
+Complete User Journey
+Login
+   ↓
+Dashboard
+   ↓
+See Overview
+   ↓
+Search Machine
+   ↓
+Open Machine
+   ↓
+Check Health
+   ↓
+Check Alerts
+   ↓
+Investigate Timeline
+   ↓
+Open Tabs
+   ↓
+Resolve Problem
+Final Site Map
+Login
+
+Dashboard
+│
+├── Search Machine
+│
+├── Machine List
+│
+└── Machine Details
+      ├── Performance
+      ├── Inventory
+      ├── Security
+      ├── Devices
+      ├── Processes
+      └── History
+
+Machines
+
+Alerts
+
+Reports
+
+Settings

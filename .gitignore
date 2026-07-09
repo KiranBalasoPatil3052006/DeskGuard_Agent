@@ -1,0 +1,57 @@
+# ============================
+# .NET / C# Agent
+# ============================
+DeskGuardAgent/bin/
+DeskGuardAgent/obj/
+DeskGuardAgent/Logs/
+DeskGuardAgent/Storage/
+*.user
+*.suo
+*.vs/
+
+# ============================
+# Laravel Backend
+# ============================
+/Backend/.env
+/Backend/.env.backup
+/Backend/.env.production
+/Backend/vendor/
+/Backend/node_modules/
+/Backend/public/build/
+/Backend/public/hot
+/Backend/public/storage
+/Backend/storage/*.key
+/Backend/storage/pail
+/Backend/_ide_helper.php
+/Backend/.phpunit.cache
+/Backend/.phpactor.json
+/Backend/Homestead.json
+/Backend/Homestead.yaml
+
+# ============================
+# Frontend (React/Vite)
+# ============================
+dashboard-main/deskguard-frontend/node_modules/
+dashboard-main/deskguard-frontend/dist/
+dashboard-main/deskguard-frontend/dist-ssr/
+dashboard-main/deskguard-frontend/*.local
+
+# Stray nested copy (if kept)
+dashboard-main/dashboard-main/node_modules/
+dashboard-main/dashboard-main/dist/
+
+# ============================
+# OS Files
+# ============================
+.DS_Store
+Thumbs.db
+*.log
+
+# ============================
+# Editor
+# ============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
