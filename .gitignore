@@ -40,6 +40,9 @@ dashboard-main/deskguard-frontend/dist/
 dashboard-main/deskguard-frontend/dist-ssr/
 dashboard-main/deskguard-frontend/*.local
 
+# Zipped backups (large files)
+*.zip
+
 # Stray nested copy (if kept)
 dashboard-main/dashboard-main/node_modules/
 dashboard-main/dashboard-main/dist/

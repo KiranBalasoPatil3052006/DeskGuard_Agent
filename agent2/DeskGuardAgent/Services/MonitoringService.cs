@@ -726,6 +726,10 @@ namespace DeskGuardAgent.Services
                         connection_type = d.ConnectionType,
                         device_status = d.Status,
                         last_seen = d.LastSeen.ToString("O"),
+                        device_id = d.DeviceId,
+                        has_problem = d.HasProblem,
+                        problem_description = d.ProblemDescription,
+                        driver_version = d.DriverVersion
                     }).ToList()
                 };
 

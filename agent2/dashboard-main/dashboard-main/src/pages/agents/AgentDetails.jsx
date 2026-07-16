@@ -109,7 +109,7 @@ const AgentDetails = () => {
                     <FaUser className="text-muted" size={14} />
                     <small className="text-muted">Assigned User</small>
                   </div>
-                  <p className="fw-semibold mb-0">{agent.assigned_user?.name || agent.employee_mobile_number || '-'}</p>
+                  <p className="fw-semibold mb-0">{agent.assigned_user?.name || agent.current_user || agent.employee_mobile_number || '-'}</p>
                 </div>
                 <div className="col-md-6">
                   <div className="d-flex align-items-center gap-2 mb-2">

@@ -28,18 +28,24 @@ const AgentsList = () => {
       if (statusFilter !== 'all') params.status = statusFilter;
       const res = await getAgents(params);
       const d = res.data || res;
-      setAgents(d.data || []);
-      setTotalPages(d.lastPage || d.last_page || 1);
+      if (Array.isArray(d)) {
+        setAgents(d);
+        setTotalPages(res.last_page || res.lastPage || 1);
+      } else {
+        setAgents(d.data || []);
+        setTotalPages(d.last_page || d.lastPage || 1);
+      }
 
       const summaryRes = await getAgentSummary();
       const s = summaryRes.data || summaryRes;
       setSummary({
-        total: s.total || 0,
+        total: s.total_machines || s.total || 0,
         online_count: s.online_count || 0,
         offline_count: s.offline_count || 0,
       });
     } catch (err) {
       setAgents([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }

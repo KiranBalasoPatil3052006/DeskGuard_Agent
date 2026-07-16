@@ -7,7 +7,10 @@ import {
   FaBatteryFull, FaDesktop,
   FaClock, FaUser, FaList, FaSyncAlt, FaThermometerHalf,
   FaTachometerAlt, FaInfoCircle, FaCube,
-  FaLayerGroup, FaServer
+  FaLayerGroup, FaServer,
+  FaMobile, FaTablet, FaPrint, FaWifi, FaMicrophone, FaHeadphones,
+  FaCamera, FaKeyboard, FaMouse, FaDatabase,
+  FaCheckCircle
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import { useQueryClient } from '@tanstack/react-query';
@@ -278,6 +281,7 @@ const MachineDetails = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [deviceIssues, setDeviceIssues] = useState(null);
   const [devicePage, setDevicePage] = useState(1);
+  const [deviceFilter, setDeviceFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const PER_PAGE = 50;
 
@@ -422,6 +426,53 @@ const MachineDetails = () => {
       return num > 999999 ? (num / 1073741824).toFixed(1) + ' GB' : (num / 1048576).toFixed(1) + ' MB';
     }
     return String(value);
+  };
+
+  const isExternalDevice = (device) => {
+    const externalTypes = ['USB', 'Bluetooth', 'Network', 'Docking', 'DisplayPort'];
+    return externalTypes.includes(device.connection_type);
+  };
+
+  const getDeviceIcon = (deviceType) => {
+    switch (deviceType?.toLowerCase()) {
+      case 'phone': case 'mobile': return <FaMobile className="text-primary" />;
+      case 'tablet': return <FaTablet className="text-primary" />;
+      case 'printer': return <FaPrint className="text-info" />;
+      case 'scanner': return <FaDesktop className="text-secondary" />;
+      case 'camera': return <FaCamera className="text-danger" />;
+      case 'keyboard': return <FaKeyboard className="text-muted" />;
+      case 'mouse': return <FaMouse className="text-muted" />;
+      case 'monitor': return <FaDesktop className="text-info" />;
+      case 'usb': return <FaUsb className="text-warning" />;
+      case 'bluetooth': return <FaWifi className="text-primary" />;
+      case 'storage': return <FaHdd className="text-secondary" />;
+      case 'audio': return <FaHeadphones className="text-success" />;
+      case 'network': return <FaNetworkWired className="text-info" />;
+      case 'dockingstation': return <FaServer className="text-primary" />;
+      case 'hid': return <FaMouse className="text-muted" />;
+      default: return <FaCube className="text-secondary" />;
+    }
+  };
+
+  const getDeviceTypeBadge = (deviceType) => {
+    const badges = {
+      phone: 'bg-primary', mobile: 'bg-primary', tablet: 'bg-primary',
+      printer: 'bg-info', scanner: 'bg-secondary',
+      camera: 'bg-danger', keyboard: 'bg-muted', mouse: 'bg-muted',
+      monitor: 'bg-info', usb: 'bg-warning text-dark', bluetooth: 'bg-primary',
+      storage: 'bg-secondary', audio: 'bg-success', network: 'bg-info',
+      dockingstation: 'bg-primary', hid: 'bg-muted'
+    };
+    return badges[deviceType?.toLowerCase()] || 'bg-secondary';
+  };
+
+  const filterDevices = (devices) => {
+    if (!devices) return [];
+    return devices.filter(d => {
+      if (deviceFilter === 'external') return isExternalDevice(d);
+      if (deviceFilter === 'issues') return d.has_problem === true;
+      return true;
+    });
   };
 
   const renderChanges = useCallback(() => {
@@ -619,15 +670,48 @@ const MachineDetails = () => {
       case 'Devices':
         return (
           <div>
-            <h6 className="fw-bold mb-3">Connected Devices</h6>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="fw-bold mb-0">Connected Devices</h6>
+              <div className="d-flex gap-2">
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: 'auto', minWidth: '150px' }}
+                  value={deviceFilter}
+                  onChange={(e) => setDeviceFilter(e.target.value)}
+                >
+                  <option value="all">All Devices</option>
+                  <option value="external">External Only (USB/BT/Network)</option>
+                  <option value="issues">Devices with Issues</option>
+                </select>
+              </div>
+            </div>
             {devicesLoading ? <div className="text-center py-5"><div className="spinner-border text-primary" role="status" /></div> : (
               <>
                 <div className="table-responsive"><table className="table table-hover align-middle mb-0">
-                  <thead className="table-light"><tr><th>Device</th><th>Type</th><th>Manufacturer</th><th>Connection</th><th>Status</th><th>Last Seen</th></tr></thead>
-                  <tbody>{(Array.isArray(devices?.connected_devices?.data || devices?.connected_devices) ? (devices.connected_devices.data || devices.connected_devices) : []).map(d => (
-                    <tr key={d.id} className="device-row" onClick={() => handleDeviceClick(d)} style={{ cursor: 'pointer' }}>
-                      <td className="fw-semibold small">{d.device_name}</td><td className="small">{d.device_type || '—'}</td><td className="small text-muted">{d.manufacturer || '—'}</td><td className="small">{d.connection_type || '—'}</td>
-                      <td><span className={`badge ${d.status === 'connected' ? 'bg-success' : 'bg-secondary'}`}>{d.status}</span></td>
+                  <thead className="table-light"><tr><th>Device</th><th>Type</th><th>Manufacturer</th><th>Connection</th><th>Status</th><th>Issues</th><th>Last Seen</th></tr></thead>
+                  <tbody>{filterDevices(Array.isArray(devices?.connected_devices?.data || devices?.connected_devices) ? (devices.connected_devices.data || devices.connected_devices) : []).map(d => (
+                    <tr key={d.id} className={`device-row ${d.has_problem ? 'table-warning' : ''}`} onClick={() => handleDeviceClick(d)} style={{ cursor: 'pointer' }}>
+                      <td className="fw-semibold small d-flex align-items-center gap-2">
+                        {getDeviceIcon(d.device_type)}
+                        {d.device_name}
+                        {d.device_id && <span className="badge bg-light text-dark text-muted small" style={{fontSize: '0.65rem'}} title="Hardware ID">{d.device_id.substring(0, 30)}...</span>}
+                      </td>
+                      <td className="small"><span className={`badge ${getDeviceTypeBadge(d.device_type)}`}>{d.device_type || '—'}</span></td>
+                      <td className="small text-muted">{d.manufacturer || '—'}</td>
+                      <td className="small">
+                        <span className="badge bg-light text-dark border">{d.connection_type || '—'}</span>
+                        {isExternalDevice(d) && <span className="ms-1 badge bg-success" style={{fontSize: '0.65rem'}}>External</span>}
+                      </td>
+                      <td><span className={`badge ${d.status === 'connected' ? 'bg-success' : d.status === 'error' ? 'bg-danger' : 'bg-secondary'}`}>{d.status}</span></td>
+                      <td>
+                        {d.has_problem ? (
+                          <span className="badge bg-danger" data-bs-toggle="tooltip" data-bs-placement="top" title={d.problem_description || 'Device has an issue'}>
+                            <FaExclamationTriangle className="me-1" /> Issue
+                          </span>
+                        ) : (
+                          <span className="text-success small"><FaCheckCircle className="me-1" /> OK</span>
+                        )}
+                      </td>
                       <td className="small text-muted">{d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'}</td>
                     </tr>
                   ))}</tbody>
@@ -646,29 +730,69 @@ const MachineDetails = () => {
               <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                 <div className="modal-dialog modal-lg modal-dialog-centered">
                   <div className="modal-content" style={{ borderRadius: '16px' }}>
-                    <div className="modal-header border-0"><h5 className="modal-title fw-bold">{selectedDevice.device_name}</h5><button type="button" className="btn-close" onClick={() => setSelectedDevice(null)}/></div>
+                    <div className="modal-header border-0">
+                      <div className="d-flex align-items-center gap-2">
+                        {getDeviceIcon(selectedDevice.device_type)}
+                        <h5 className="modal-title fw-bold mb-0">{selectedDevice.device_name}</h5>
+                        {selectedDevice.has_problem && <span className="badge bg-danger"><FaExclamationTriangle className="me-1" /> Has Issue</span>}
+                        {isExternalDevice(selectedDevice) && <span className="badge bg-success"><FaUsb className="me-1" /> External</span>}
+                      </div>
+                      <button type="button" className="btn-close" onClick={() => setSelectedDevice(null)}/>
+                    </div>
                     <div className="modal-body">
-                      {deviceIssues ? (<>
-                        <h6 className="fw-bold mb-2">Device Info</h6>
-                        <div className="row g-2 mb-3 small">
-                          <div className="col-6"><span className="text-muted">Type:</span> {deviceIssues.device?.device_type || selectedDevice.device_type || '—'}</div>
-                          <div className="col-6"><span className="text-muted">Manufacturer:</span> {deviceIssues.device?.manufacturer || selectedDevice.manufacturer || '—'}</div>
-                          <div className="col-6"><span className="text-muted">Connection:</span> {deviceIssues.device?.connection_type || selectedDevice.connection_type || '—'}</div>
-                          <div className="col-6"><span className="text-muted">Status:</span> {deviceIssues.device?.status || selectedDevice.status || '—'}</div>
-                        </div>
-                        <h6 className="fw-bold mb-2">Related Alerts</h6>
-                        <div className="table-responsive mb-3">{Array.isArray(deviceIssues.alerts) && deviceIssues.alerts.length > 0 ? (
-                          <table className="table table-sm"><thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>{deviceIssues.alerts.map(a => (
-                            <tr key={a.id}><td className="small">{a.title}</td><td><SeverityBadge severity={a.severity}/></td><td className="small">{a.status}</td><td className="small text-muted">{a.created_at ? new Date(a.created_at).toLocaleString() : '—'}</td></tr>
-                          ))}</tbody></table>
-                        ) : <p className="text-muted small">No related alerts.</p>}</div>
-                        <h6 className="fw-bold mb-2">Device Events</h6>
-                        <div className="table-responsive">{Array.isArray(deviceIssues.events) && deviceIssues.events.length > 0 ? (
-                          <table className="table table-sm"><thead><tr><th>Event</th><th>Type</th><th>Date</th></tr></thead><tbody>{deviceIssues.events.map(e => (
-                            <tr key={e.id}><td className="small">{e.event_type || '—'}</td><td className="small">{e.device_type || '—'}</td><td className="small text-muted">{e.event_time ? new Date(e.event_time).toLocaleString() : '—'}</td></tr>
-                          ))}</tbody></table>
-                        ) : <p className="text-muted small">No events recorded.</p>}</div>
-                      </>) : <div className="text-center py-3"><div className="spinner-border spinner-border-sm" role="status" /></div>}
+                      {deviceIssues ? (
+                        <>
+                          <div className="row g-3 mb-3">
+                            <div className="col-md-6">
+                              <div className="card p-3 h-100">
+                                <h6 className="fw-bold mb-2">Device Info</h6>
+                                <div className="small">
+                                  <div><span className="text-muted">Type:</span> <span className="badge ms-2 {getDeviceTypeBadge(deviceIssues.device?.device_type || selectedDevice.device_type)}">{deviceIssues.device?.device_type || selectedDevice.device_type || '—'}</span></div>
+                                  <div className="mt-2"><span className="text-muted">Manufacturer:</span> <span className="fw-semibold ms-2">{deviceIssues.device?.manufacturer || selectedDevice.manufacturer || '—'}</span></div>
+                                  <div className="mt-2"><span className="text-muted">Connection:</span> <span className="badge bg-light text-dark border ms-2">{deviceIssues.device?.connection_type || selectedDevice.connection_type || '—'}</span></div>
+                                  <div className="mt-2"><span className="text-muted">Status:</span> <span className={`badge ms-2 ${(deviceIssues.device?.status || selectedDevice.status) === 'connected' ? 'bg-success' : 'bg-danger'}`}>{deviceIssues.device?.status || selectedDevice.status || '—'}</span></div>
+                                  <div className="mt-2"><span className="text-muted">Hardware ID:</span> <code className="small ms-2 d-block bg-light p-1 rounded">{deviceIssues.device?.device_id || selectedDevice.device_id || '—'}</code></div>
+                                  <div className="mt-2"><span className="text-muted">Driver Version:</span> <span className="fw-semibold ms-2">{deviceIssues.device?.driver_version || '—'}</span></div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-md-6">
+                              <div className="card p-3 h-100">
+                                <h6 className="fw-bold mb-2">Health Status</h6>
+                                {selectedDevice.has_problem ? (
+                                  <div className="alert alert-danger mb-0 p-3">
+                                    <FaExclamationTriangle className="me-2" /><strong>Device Issue Detected</strong>
+                                    <div className="small mt-2">{selectedDevice.problem_description || deviceIssues.device?.problem_description || 'Unknown issue'}</div>
+                                  </div>
+                                ) : (
+                                  <div className="alert alert-success mb-0 p-3">
+                                    <FaCheckCircle className="me-2" /><strong>Device Working Properly</strong>
+                                    <div className="small mt-2 text-muted">No issues detected</div>
+                                  </div>
+                                )}
+                                <div className="mt-3 small">
+                                  <div><span className="text-muted">Last Seen:</span> <span className="fw-semibold ms-2">{selectedDevice.last_seen ? new Date(selectedDevice.last_seen).toLocaleString() : '—'}</span></div>
+                                  <div className="mt-1"><span className="text-muted">Collection Time:</span> <span className="fw-semibold ms-2">{new Date().toLocaleString()}</span></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <h6 className="fw-bold mb-2">Related Alerts</h6>
+                          <div className="table-responsive mb-3">{Array.isArray(deviceIssues.alerts) && deviceIssues.alerts.length > 0 ? (
+                            <table className="table table-sm"><thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>{deviceIssues.alerts.map(a => (
+                              <tr key={a.id}><td className="small">{a.title}</td><td><SeverityBadge severity={a.severity}/></td><td className="small">{a.status}</td><td className="small text-muted">{a.created_at ? new Date(a.created_at).toLocaleString() : '—'}</td></tr>
+                            ))}</tbody></table>
+                          ) : <p className="text-muted small">No related alerts.</p>}</div>
+                          <h6 className="fw-bold mb-2">Device Events</h6>
+                          <div className="table-responsive">{Array.isArray(deviceIssues.events) && deviceIssues.events.length > 0 ? (
+                            <table className="table table-sm"><thead><tr><th>Event</th><th>Type</th><th>Date</th></tr></thead><tbody>{deviceIssues.events.map(e => (
+                              <tr key={e.id}><td className="small">{e.event_type || '—'}</td><td className="small">{e.device_type || '—'}</td><td className="small text-muted">{e.event_time ? new Date(e.event_time).toLocaleString() : '—'}</td></tr>
+                            ))}</tbody></table>
+                          ) : <p className="text-muted small">No events recorded.</p>}</div>
+                        </>
+                      ) : (
+                        <div className="text-center py-3"><div className="spinner-border spinner-border-sm" role="status" /></div>
+                      )}
                     </div>
                   </div>
                 </div>
