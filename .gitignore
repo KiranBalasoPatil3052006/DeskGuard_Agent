@@ -5,6 +5,10 @@ DeskGuardAgent/bin/
 DeskGuardAgent/obj/
 DeskGuardAgent/Logs/
 DeskGuardAgent/Storage/
+agent2/DeskGuardAgent/bin/
+agent2/DeskGuardAgent/obj/
+agent2/DeskGuardAgent/Logs/
+agent2/DeskGuardAgent/Storage/
 *.user
 *.suo
 *.vs/
