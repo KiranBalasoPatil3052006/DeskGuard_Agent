@@ -20,6 +20,7 @@ const Sidebar = ({ isOpen, onToggle }) => {
   const menuItems = [
     { path: '/dashboard', name: 'Dashboard', icon: <FaTachometerAlt /> },
     { path: '/machines', name: 'Machines', icon: <FaServer /> },
+    { path: '/agents', name: 'Agents', icon: <FaShieldAlt /> },
     { path: '/reports', name: 'Reports', icon: <FaFileAlt /> },
     { path: '/alerts', name: 'Alerts', icon: <FaBell /> },
     ...(role === 'Super Admin' ? [{ path: '/accounts', name: 'Create Account', icon: <FaUserPlus /> }] : []),

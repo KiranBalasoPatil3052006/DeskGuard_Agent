@@ -1,18 +1,34 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaUserPlus } from 'react-icons/fa';
+import { registerUser } from '../../services/auth';
 import './Register.css';
 
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    navigate('/login');
+    setError('');
+    setLoading(true);
+    try {
+      const result = await registerUser(name, email, password);
+      if (result.token) {
+        localStorage.setItem('auth_token', result.token);
+        navigate('/');
+      } else if (result.success) {
+        navigate('/login');
+      }
+    } catch (err) {
+      setError(err?.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -25,6 +41,8 @@ const Register = () => {
         
         <h5 className="fw-bold text-center mb-1" style={{ color: 'var(--text-body)' }}>Sign Up</h5>
         <p className="text-center text-muted mb-3" style={{ fontSize: '0.85rem' }}>Create a new account.</p>
+
+        {error && <div className="alert alert-danger py-2 small text-center mb-2">{error}</div>}
 
         <form onSubmit={handleRegister}>
           <div className="mb-2">
@@ -66,33 +84,10 @@ const Register = () => {
             />
           </div>
 
-          <div className="mb-3 d-flex gap-3 justify-content-center">
-            <div className="form-check">
-              <input 
-                className="form-check-input border-secondary" 
-                type="radio" 
-                name="roleOption" 
-                id="roleUser" 
-                checked={role === 'user'} 
-                onChange={() => setRole('user')} 
-              />
-              <label className="form-check-label small" htmlFor="roleUser" style={{ color: 'var(--text-body)' }}>User</label>
-            </div>
-            <div className="form-check">
-              <input 
-                className="form-check-input border-secondary" 
-                type="radio" 
-                name="roleOption" 
-                id="roleAdmin" 
-                checked={role === 'admin'} 
-                onChange={() => setRole('admin')} 
-              />
-              <label className="form-check-label small" htmlFor="roleAdmin" style={{ color: 'var(--text-body)' }}>Admin</label>
-            </div>
-          </div>
 
-          <button type="submit" className="btn btn-primary w-100 py-2 mb-3 fw-semibold text-white">
-            Sign Up
+
+          <button type="submit" className="btn btn-primary w-100 py-2 mb-3 fw-semibold text-white" disabled={loading}>
+            {loading ? 'Creating Account...' : 'Sign Up'}
           </button>
 
           <div className="text-center small text-muted">

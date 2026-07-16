@@ -7,7 +7,8 @@ import {
   FaFileAlt, 
   FaBell, 
   FaCog, 
-  FaUser 
+  FaUser,
+  FaUserPlus
 } from 'react-icons/fa';
 
 const Sidebar = ({ isOpen }) => {
@@ -16,11 +17,11 @@ const Sidebar = ({ isOpen }) => {
   const menuItems = [
     { path: '/dashboard', name: 'Dashboard', icon: <FaTachometerAlt /> },
     { path: '/machines', name: 'Machines', icon: <FaServer /> },
-    { path: '/monitoring', name: 'Live Monitoring', icon: <FaChartLine /> },
     { path: '/reports', name: 'Reports', icon: <FaFileAlt /> },
     { path: '/alerts', name: 'Alerts', icon: <FaBell /> },
     { path: '/settings', name: 'Settings', icon: <FaCog /> },
     { path: '/profile', name: 'User Profile', icon: <FaUser /> },
+    { path: '/register', name: 'Create Account', icon: <FaUserPlus /> },
   ];
 
   return (

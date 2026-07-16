@@ -1,0 +1,4 @@
+C:\Users\KIRAN BALASO PATIL\Desktop\DeskGuardAgentSetup\temp\appsettings.Development.json
+C:\Users\KIRAN BALASO PATIL\Desktop\DeskGuardAgentSetup\temp\appsettings.json
+C:\Users\KIRAN BALASO PATIL\Desktop\DeskGuardAgentSetup\temp\DeskGuardAgent.pdb
+C:\Users\KIRAN BALASO PATIL\Desktop\DeskGuardAgentSetup\temp\DeskGuardAgent.exe

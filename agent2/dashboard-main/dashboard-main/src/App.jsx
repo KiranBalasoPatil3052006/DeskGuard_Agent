@@ -32,6 +32,8 @@ const ChangesList = lazy(() => import('./pages/changes/ChangesList'));
 const Settings = lazy(() => import('./pages/settings/Settings'));
 const AlertThresholds = lazy(() => import('./pages/settings/AlertThresholds'));
 const AccountsList = lazy(() => import('./pages/accounts/AccountsList'));
+const AgentsList = lazy(() => import('./pages/agents/AgentsList'));
+const AgentDetails = lazy(() => import('./pages/agents/AgentDetails'));
 const ComponentShowcase = lazy(() => import('./pages/docs/ComponentShowcase'));
 
 function App() {
@@ -56,6 +58,8 @@ function App() {
             <Route path="/settings" element={<Suspense fallback={<div className="text-center py-5"><div className="spinner-border" role="status" /></div>}><ErrorBoundary><Settings /></ErrorBoundary></Suspense>} />
             <Route path="/settings/alert-thresholds" element={<Suspense fallback={<div className="text-center py-5"><div className="spinner-border" role="status" /></div>}><ErrorBoundary><AlertThresholds /></ErrorBoundary></Suspense>} />
             <Route path="/accounts" element={<Suspense fallback={<div className="text-center py-5"><div className="spinner-border" role="status" /></div>}><ErrorBoundary><AccountsList /></ErrorBoundary></Suspense>} />
+            <Route path="/agents" element={<Suspense fallback={<div className="text-center py-5"><div className="spinner-border" role="status" /></div>}><ErrorBoundary><AgentsList /></ErrorBoundary></Suspense>} />
+            <Route path="/agents/:id" element={<Suspense fallback={<div className="text-center py-5"><div className="spinner-border" role="status" /></div>}><ErrorBoundary><AgentDetails /></ErrorBoundary></Suspense>} />
             <Route path="/components" element={<Suspense fallback={<div className="text-center py-5"><div className="spinner-border" role="status" /></div>}><ErrorBoundary><ComponentShowcase /></ErrorBoundary></Suspense>} />
           </Route>
         </Route>
