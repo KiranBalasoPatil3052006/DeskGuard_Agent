@@ -11,6 +11,9 @@ using DeskGuardAgent.Interfaces;
 using DeskGuardAgent.Services;
 using DeskGuardAgent.Utilities;
 using Serilog;
+using System;
+using System.IO;
+using System.Reflection;
 
 namespace DeskGuardAgent
 {
@@ -26,118 +29,90 @@ namespace DeskGuardAgent
         /// <param name="args">Command-line arguments.</param>
         public static void Main(string[] args)
         {
+            // Early Serilog bootstrap from configuration (appsettings.json)
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            Log.Logger = new LoggerConfiguration()
+                .ReadFrom.Configuration(configuration)
+                .Enrich.FromLogContext()
+                .Enrich.WithThreadId()
+                .CreateBootstrapLogger();
+
             try
             {
-                // Create the host builder first to access configuration.
-                var builder = Host.CreateApplicationBuilder(args);
-
-                // Bind AgentSettings early so we can use LogPath for Serilog configuration.
-                AgentSettings agentSettings = new AgentSettings();
-                builder.Configuration.GetSection("AgentSettings").Bind(agentSettings);
-
-                // Determine the log directory from configuration or default to "Logs".
-                string logPath = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory,
-                    string.IsNullOrWhiteSpace(agentSettings.LogPath) ? "Logs" : agentSettings.LogPath);
-
-                // Configure Serilog as the primary logging provider.
-                // Logs are written to both console (for debugging) and file (for persistence).
-                Log.Logger = new LoggerConfiguration()
-                    .MinimumLevel.Information()
-                    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
-                    .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
-                    .Enrich.FromLogContext()
-                    .WriteTo.Console()
-                    .WriteTo.File(
-                        path: Path.Combine(logPath, "deskguard-.log"),
-                        rollingInterval: RollingInterval.Day,
-                        retainedFileCountLimit: 30,
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-                    .CreateLogger();
-
-                // Log application startup.
                 Log.Information("DeskGuard Agent starting up.");
 
-                // Configure Serilog as the logging provider for the host.
-                builder.Logging.ClearProviders();
-                builder.Logging.AddSerilog();
+                // Initialize diagnostics store
+                var agentVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+                var machineId = MachineIdentifier.GenerateMachineId();
+                DiagnosticsStore.Instance.Initialize(agentVersion, machineId);
+                DiagnosticsStore.Instance.SetServiceStatus("Starting");
 
-                // Configure Windows Service support.
-                // When running as a Windows Service, the agent will respond to SCM commands.
-                builder.Services.AddWindowsService(options =>
+                // Configure unhandled exception handlers
+                AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
                 {
-                    options.ServiceName = Constants.AgentConstants.ServiceName;
-                });
+                    if (e.ExceptionObject is Exception ex)
+                    {
+                        Log.Fatal(ex, "Unhandled AppDomain exception");
+                        DiagnosticsStore.Instance.RecordUnhandledException(ex);
+                    }
+                };
+                TaskScheduler.UnobservedTaskException += (sender, e) =>
+                {
+                    Log.Fatal(e.Exception, "Unobserved task exception");
+                    DiagnosticsStore.Instance.RecordUnhandledException(e.Exception);
+                    e.SetObserved();
+                };
 
-                // Register configuration sections from appsettings.json.
-                builder.Services.Configure<AgentSettings>(
-                    builder.Configuration.GetSection("AgentSettings"));
-                builder.Services.Configure<MonitoringSettings>(
-                    builder.Configuration.GetSection("MonitoringSettings"));
+                // Create the host builder
+                var builder = Host.CreateApplicationBuilder(args);
+                builder.Configuration.AddConfiguration(configuration);
 
-                // Bind MonitoringSettings for direct injection.
-                MonitoringSettings monitoringSettings = new MonitoringSettings();
+                // Register configuration sections
+                builder.Services.Configure<AgentSettings>(builder.Configuration.GetSection("AgentSettings"));
+                builder.Services.Configure<MonitoringSettings>(builder.Configuration.GetSection("MonitoringSettings"));
+
+                // Bind settings for early use
+                var agentSettings = new AgentSettings();
+                builder.Configuration.GetSection("AgentSettings").Bind(agentSettings);
+                var monitoringSettings = new MonitoringSettings();
                 builder.Configuration.GetSection("MonitoringSettings").Bind(monitoringSettings);
 
-                // Register configuration objects as singletons for DI.
+                // Generate AgentId if missing
+                if (string.IsNullOrWhiteSpace(agentSettings.AgentId))
+                    agentSettings.AgentId = MachineIdentifier.GenerateMachineId();
+
+                // Register settings as singletons
                 builder.Services.AddSingleton(agentSettings);
                 builder.Services.AddSingleton(monitoringSettings);
+                builder.Services.AddSingleton(DiagnosticsStore.Instance);
 
-                // Generate a machine-specific agent ID if not already configured.
-                if (string.IsNullOrWhiteSpace(agentSettings.AgentId))
-                {
-                    agentSettings.AgentId = MachineIdentifier.GenerateMachineId();
-                }
-
-                // Run configuration validation and log any issues.
-                List<string> configErrors = ValidationHelper.ValidateAgentConfiguration(agentSettings);
-                configErrors.AddRange(ValidationHelper.ValidateMonitoringConfiguration(monitoringSettings));
-                foreach (var error in configErrors)
-                {
-                    Log.Warning("Configuration issue: {Error}", error);
-                }
-
-                // Validate and prepare API base URL.
-                if (string.IsNullOrWhiteSpace(agentSettings.ApiBaseUrl))
-                {
-                    Log.Warning("ApiBaseUrl is not configured in appsettings.json. " +
-                        "The agent will start in offline/test mode. " +
-                        "Collectors will run and log data, but API calls will fail gracefully.");
-                    agentSettings.ApiBaseUrl = "https://deskguardbackend-production.up.railway.app/";
-                }
-
-                // Register the HttpClient for API communication.
+                // Register services (same as before)
                 builder.Services.AddHttpClient<IApiSenderService, ApiSenderService>(client =>
                 {
                     client.BaseAddress = new Uri(agentSettings.ApiBaseUrl.TrimEnd('/') + "/");
                     client.Timeout = TimeSpan.FromSeconds(agentSettings.RequestTimeoutSeconds);
                 });
-
-                // Register HttpClient for MonitoringService (used for offline queue flushing).
                 builder.Services.AddHttpClient<MonitoringService>(client =>
                 {
                     client.BaseAddress = new Uri(agentSettings.ApiBaseUrl.TrimEnd('/') + "/");
                     client.Timeout = TimeSpan.FromSeconds(agentSettings.RequestTimeoutSeconds);
                 });
 
-                // Register logging service.
                 builder.Services.AddSingleton<ILoggerService>(sp =>
                 {
-                    ILogger<Program> logger = sp.GetRequiredService<ILogger<Program>>();
+                    var logger = sp.GetRequiredService<ILogger<Program>>();
                     return new LoggerService(logger);
                 });
-
-                // Register RetryService.
                 builder.Services.AddSingleton<RetryService>();
-
-                // Register OfflineQueueService.
                 builder.Services.AddSingleton<IOfflineQueueService, OfflineQueueService>();
-
-                // Register Change Detection Services.
                 builder.Services.AddSingleton<BaselineManager>();
                 builder.Services.AddSingleton<ChangeDetectionService>();
 
-                // Register all collectors.
+                // Collectors
                 builder.Services.AddTransient<CpuCollector>();
                 builder.Services.AddTransient<MemoryCollector>();
                 builder.Services.AddTransient<DiskCollector>();
@@ -157,31 +132,40 @@ namespace DeskGuardAgent
                 builder.Services.AddTransient<UsbCollector>();
                 builder.Services.AddSingleton<Collectors.PeripheralCollector>();
 
-                // Register MonitoringService.
                 builder.Services.AddSingleton<IMonitoringService, MonitoringService>();
-
-                // Register SchedulerService.
                 builder.Services.AddSingleton<SchedulerService>();
-
-                // Register DeviceEventWatcher (real-time device monitoring).
                 builder.Services.AddSingleton<DeviceEventWatcher>();
 
-                // Register the Worker as a hosted service.
                 builder.Services.AddHostedService<Worker>();
 
-                // Build and run the host.
+                builder.Services.AddWindowsService(options =>
+                {
+                    options.ServiceName = Constants.AgentConstants.ServiceName;
+                });
+
+                builder.Logging.ClearProviders();
+                builder.Logging.AddSerilog(dispose: true);
+
                 var host = builder.Build();
+
+                // Log lifecycle start
+                LifecycleLogger.Log(LifecycleEvent.ServiceStart, $"Agent version {agentVersion} on machine {machineId}");
+                DiagnosticsStore.Instance.SetServiceStatus("Running");
+
                 host.Run();
+
+                // Service stop lifecycle
+                LifecycleLogger.Log(LifecycleEvent.ServiceStop, "Service stopped gracefully");
+                DiagnosticsStore.Instance.SetServiceStatus("Stopped");
             }
             catch (Exception ex)
             {
-                // Log any fatal startup exceptions.
                 Log.Fatal(ex, "DeskGuard Agent failed to start.");
+                DiagnosticsStore.Instance.RecordUnhandledException(ex);
                 throw;
             }
             finally
             {
-                // Ensure Serilog flushes all logs before exit.
                 Log.CloseAndFlush();
             }
         }

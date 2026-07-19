@@ -72,6 +72,9 @@ namespace DeskGuardAgent.Services
         private readonly BaselineManager _baselineManager;
         private readonly ChangeDetectionService _changeDetectionService;
 
+        // Diagnostics
+        private readonly DiagnosticsStore _diagnostics;
+
         /// <summary>
         /// Initializes a new instance of the MonitoringService class.
         /// All dependencies are injected via constructor injection following DI patterns.
@@ -102,7 +105,8 @@ namespace DeskGuardAgent.Services
             UsbCollector usbCollector,
             PeripheralCollector peripheralCollector,
             BaselineManager baselineManager,
-            ChangeDetectionService changeDetectionService)
+            ChangeDetectionService changeDetectionService,
+            DiagnosticsStore diagnostics)
         {
             _logger = logger;
             _agentSettings = agentSettings;
@@ -110,6 +114,7 @@ namespace DeskGuardAgent.Services
             _apiSender = apiSender;
             _offlineQueue = offlineQueue;
             _httpClient = httpClient;
+            _diagnostics = diagnostics;
 
             _cpuCollector = cpuCollector;
             _memoryCollector = memoryCollector;
@@ -249,6 +254,8 @@ namespace DeskGuardAgent.Services
                 {
                     _logger.LogWarning("Health payload delivery failed. Payload queued for offline retry.");
                 }
+                // Record heartbeat regardless of health send result to indicate agent alive.
+                _diagnostics.RecordHeartbeat();
 
                 // Step 4b: Initialize baselines for security, network, and configuration
                 // on the first cycle, then detect changes on subsequent cycles.

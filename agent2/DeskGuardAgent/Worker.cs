@@ -1,6 +1,7 @@
 using DeskGuardAgent.Configuration;
 using DeskGuardAgent.Interfaces;
 using DeskGuardAgent.Services;
+using DeskGuardAgent.Utilities;
 
 namespace DeskGuardAgent
 {
@@ -12,6 +13,7 @@ namespace DeskGuardAgent
         private readonly DeviceEventWatcher _deviceEventWatcher;
         private readonly MonitoringSettings _monitoringSettings;
         private readonly IApiSenderService _apiSender;
+        private readonly DiagnosticsStore _diagnostics;
 
         public Worker(
             ILogger<Worker> logger,
@@ -19,7 +21,8 @@ namespace DeskGuardAgent
             SchedulerService schedulerService,
             DeviceEventWatcher deviceEventWatcher,
             MonitoringSettings monitoringSettings,
-            IApiSenderService apiSender)
+            IApiSenderService apiSender,
+            DiagnosticsStore diagnostics)
         {
             _logger = logger;
             _monitoringService = monitoringService;
@@ -27,11 +30,14 @@ namespace DeskGuardAgent
             _deviceEventWatcher = deviceEventWatcher;
             _monitoringSettings = monitoringSettings;
             _apiSender = apiSender;
+            _diagnostics = diagnostics;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("DeskGuard Agent Worker started.");
+            LifecycleLogger.Log(LifecycleEvent.ServiceStart, "Worker started");
+            _diagnostics.SetServiceStatus("Running");
 
             try
             {
@@ -53,6 +59,8 @@ namespace DeskGuardAgent
             catch (Exception ex)
             {
                 _logger.LogError(ex, "DeskGuard Agent worker encountered an unexpected error.");
+                LifecycleLogger.Log(LifecycleEvent.UnhandledException, ex.Message, ex);
+                _diagnostics.RecordUnhandledException(ex);
             }
             finally
             {
@@ -63,6 +71,8 @@ namespace DeskGuardAgent
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("DeskGuard Agent Worker stopping...");
+            LifecycleLogger.Log(LifecycleEvent.ServiceStop, "Worker stopping");
+            _diagnostics.SetServiceStatus("Stopping");
 
             _deviceEventWatcher.Stop();
             _schedulerService.Stop();
@@ -79,6 +89,8 @@ namespace DeskGuardAgent
             }
 
             _logger.LogInformation("DeskGuard Agent Worker stopped.");
+            _diagnostics.SetServiceStatus("Stopped");
+            LifecycleLogger.Log(LifecycleEvent.ServiceStop, "Worker stopped");
 
             await base.StopAsync(cancellationToken);
         }

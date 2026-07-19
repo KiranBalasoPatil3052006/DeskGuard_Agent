@@ -1,0 +1,40 @@
+# Build outputs
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+
+# Published output
+publish/
+*.nupkg
+*.snupkg
+
+# User secrets & local config
+appsettings.Development.json
+appsettings.local.json
+*.local.json
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+Logs/
+
+# Test results
+TestResults/
+
+# NuGet packages
+packages/
+
+# Rider / Resharper
+*.DotSettings
+*.dotSettings
