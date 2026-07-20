@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using DeskGuardBackend.Data;
 using DeskGuardBackend.Entities;
 using DeskGuardBackend.Services.Interfaces;
 using DeskGuardBackend.Enums;
-using DeskGuardBackend.SignalR;
 
 namespace DeskGuardBackend.Services
 {
@@ -18,18 +16,15 @@ namespace DeskGuardBackend.Services
     {
         private readonly DeskGuardDbContext _dbContext;
         private readonly IAuditLogService _auditLogService;
-        private readonly IHubContext<AlertHub> _hubContext;
         private readonly ILogger<NotificationService> _logger;
 
         public NotificationService(
             DeskGuardDbContext dbContext,
             IAuditLogService auditLogService,
-            IHubContext<AlertHub> hubContext,
             ILogger<NotificationService> logger)
         {
             _dbContext = dbContext;
             _auditLogService = auditLogService;
-            _hubContext = hubContext;
             _logger = logger;
         }
 
@@ -172,8 +167,6 @@ namespace DeskGuardBackend.Services
                     new { alert_id = alert.Id, severity = alert.Severity, machine_id = alert.MachineId }
                 );
 
-                await BroadcastAlertEventAsync("alert_created", alert);
-
                 _logger.LogInformation("Alert notification sent to assigned user ID {UserId}", assignedUser.Id);
             }
             catch (Exception ex)
@@ -222,64 +215,6 @@ namespace DeskGuardBackend.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "NotificationService::SendEmailNotificationAsync failed for alert ID {AlertId}", alert.Id);
-            }
-        }
-
-        public async Task BroadcastAlertEventAsync(string eventType, Alert alert)
-        {
-            try
-            {
-                var companyId = alert.CompanyId;
-                if (companyId == 0)
-                {
-                    var machine = await _dbContext.Machines.FindAsync(alert.MachineId);
-                    companyId = machine?.CompanyId ?? 0;
-                }
-
-                if (companyId == 0) return;
-
-                var payload = new
-                {
-                    event_type = eventType,
-                    alert = new
-                    {
-                        id = alert.Id,
-                        machine_id = alert.MachineId,
-                        severity = alert.Severity,
-                        title = alert.Title,
-                        description = alert.Description,
-                        status = alert.Status,
-                        created_at = alert.CreatedAt
-                    },
-                    timestamp = DateTime.UtcNow
-                };
-
-                await _hubContext.Clients.Group($"Company_{companyId}").SendAsync("AlertEvent", payload);
-                _logger.LogDebug("SignalR broadcast AlertEvent '{EventType}' to Company_{CompanyId}", eventType, companyId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "NotificationService::BroadcastAlertEventAsync failed for alert ID {AlertId}", alert.Id);
-            }
-        }
-
-        public async Task BroadcastDashboardUpdateAsync(long companyId, string updateType, object? data = null)
-        {
-            try
-            {
-                var payload = new
-                {
-                    update_type = updateType,
-                    data = data,
-                    timestamp = DateTime.UtcNow
-                };
-
-                await _hubContext.Clients.Group($"Company_{companyId}").SendAsync("DashboardUpdate", payload);
-                _logger.LogDebug("SignalR broadcast DashboardUpdate '{UpdateType}' to Company_{CompanyId}", updateType, companyId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "NotificationService::BroadcastDashboardUpdateAsync failed for company: {CompanyId}", companyId);
             }
         }
     }

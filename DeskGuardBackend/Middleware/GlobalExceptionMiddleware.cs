@@ -46,12 +46,6 @@ namespace DeskGuardBackend.Middleware
                 "Unhandled Exception (CorrelationID: {CorrelationId}) | Path: {Path} | Client IP: {Ip}", 
                 correlationId, path, ip);
 
-            if (context.Response.HasStarted)
-            {
-                _logger.LogWarning("Response already started for {Path}, cannot write error response", path);
-                return;
-            }
-
             var code = HttpStatusCode.InternalServerError;
             var message = "An internal server error occurred.";
             object? errors = null;

@@ -1,7 +1,5 @@
 using System;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Serilog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -10,7 +8,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using DeskGuardBackend.Data;
@@ -36,14 +33,8 @@ builder.Host.UseSerilog();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<DeskGuardDbContext>(options =>
 {
-    options.UseNpgsql(connectionString, npgsqlOptions =>
-    {
-        npgsqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 3,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorCodesToAdd: null);
-    })
-    .UseSnakeCaseNamingConvention();
+    options.UseNpgsql(connectionString)
+           .UseSnakeCaseNamingConvention();
 });
 
 // Configure JWT Authentication options
@@ -80,28 +71,8 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Configure Memory Cache (L1)
+// Configure Memory Cache
 builder.Services.AddMemoryCache();
-
-// Configure Redis distributed cache (L2), optional — falls back to IMemoryCache only when unavailable
-var redisConfig = builder.Configuration.GetSection("Redis");
-if (redisConfig.GetValue<bool>("Enabled"))
-{
-    var redisConnectionString = redisConfig.GetValue<string>("ConnectionString") ?? "localhost:6379";
-    var instanceName = redisConfig.GetValue<string>("InstanceName") ?? "DeskGuard";
-    builder.Services.AddStackExchangeRedisCache(options =>
-    {
-        options.Configuration = redisConnectionString;
-        options.InstanceName = instanceName;
-    });
-    Log.Information("Redis cache enabled: {ConnectionString}", redisConnectionString);
-}
-else
-{
-    builder.Services.AddDistributedMemoryCache(); // Safe no-op fallback (no Redis)
-    Log.Information("Redis cache disabled, using local memory cache only");
-}
-builder.Services.AddSingleton<ICacheService, CacheService>();
 
 // Register Scoped Services
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -117,8 +88,6 @@ builder.Services.AddScoped<IPayloadProcessorService, PayloadProcessorService>();
 builder.Services.AddScoped<ITelemetryService, TelemetryService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
-builder.Services.AddScoped<IAccountService, AccountService>();
-builder.Services.AddScoped<IAlertProfileService, AlertProfileService>();
 
 // Register Telemetry Payload Processors (Executed sequentially in transaction)
 builder.Services.AddScoped<IPayloadProcessor, MachineProcessor>();
@@ -127,28 +96,12 @@ builder.Services.AddScoped<IPayloadProcessor, MemoryProcessor>();
 builder.Services.AddScoped<IPayloadProcessor, DiskProcessor>();
 builder.Services.AddScoped<IPayloadProcessor, BatteryProcessor>();
 builder.Services.AddScoped<IPayloadProcessor, NetworkProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, AntivirusProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, FirewallProcessor>();
 builder.Services.AddScoped<IPayloadProcessor, AlertProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, ProcessProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, ServiceProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, StartupProgramProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, EventLogProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, LoginActivityProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, UsbActivityProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, UpdateProcessor>();
-builder.Services.AddScoped<IPayloadProcessor, DeviceProcessor>();
 
-// Register Background Worker Jobs
+// Register Background Worker Job
 builder.Services.AddHostedService<OfflineCheckJob>();
-builder.Services.AddHostedService<ViewRefreshJob>();
 
-builder.Services.AddControllers()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-    });
+builder.Services.AddControllers();
 builder.Services.AddSignalR();
 
 // Swagger API Documentation
@@ -198,13 +151,16 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Enable Swagger UI (available in all environments for testing)
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Enable Swagger UI locally
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "DeskGuard API V1");
-    c.RoutePrefix = "swagger";
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "DeskGuard API V1");
+        c.RoutePrefix = "swagger";
+    });
+}
 
 // Global exception handling middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -262,9 +218,7 @@ try
                 CompanyId = company.Id,
                 Email = email,
                 Password = passwordHash,
-                Name = "Kiran Balaso Patil",
-                Phone = "6846810210",
-                EmployeeId = "EMP-0001",
+                Name = "Kiran Patil",
                 IsActive = true,
                 IsVerified = true,
                 CreatedAt = DateTime.UtcNow,
@@ -275,46 +229,6 @@ try
             await dbContext.SaveChangesAsync();
             
             Log.Information("Successfully seeded user: {Email}", email);
-
-            var superAdminRole = await dbContext.Roles.FirstOrDefaultAsync(r => r.Name == "Super Admin");
-            if (superAdminRole != null)
-            {
-                var hasRole = await dbContext.UserRoles.AnyAsync(ur => ur.UserId == newUser.Id && ur.RoleId == superAdminRole.Id);
-                if (!hasRole)
-                {
-                    dbContext.UserRoles.Add(new UserRole
-                    {
-                        RoleId = superAdminRole.Id,
-                        UserId = newUser.Id,
-                        ModelType = "App\\Models\\User"
-                    });
-                    await dbContext.SaveChangesAsync();
-                    Log.Information("Assigned Super Admin role to seeded user");
-                }
-            }
-        }
-        else
-        {
-            var existingUser = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (existingUser != null)
-            {
-                var superAdminRole = await dbContext.Roles.FirstOrDefaultAsync(r => r.Name == "Super Admin");
-                if (superAdminRole != null)
-                {
-                    var hasRole = await dbContext.UserRoles.AnyAsync(ur => ur.UserId == existingUser.Id && ur.RoleId == superAdminRole.Id);
-                    if (!hasRole)
-                    {
-                        dbContext.UserRoles.Add(new UserRole
-                        {
-                            RoleId = superAdminRole.Id,
-                            UserId = existingUser.Id,
-                            ModelType = "App\\Models\\User"
-                        });
-                        await dbContext.SaveChangesAsync();
-                        Log.Information("Assigned Super Admin role to existing seed user");
-                    }
-                }
-            }
         }
     }
 }

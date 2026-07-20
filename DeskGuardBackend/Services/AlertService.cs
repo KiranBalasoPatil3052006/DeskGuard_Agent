@@ -18,20 +18,17 @@ namespace DeskGuardBackend.Services
         private readonly DeskGuardDbContext _dbContext;
         private readonly INotificationService _notificationService;
         private readonly IAuditLogService _auditLogService;
-        private readonly IAlertProfileService _alertProfileService;
         private readonly ILogger<AlertService> _logger;
 
         public AlertService(
             DeskGuardDbContext dbContext,
             INotificationService notificationService,
             IAuditLogService auditLogService,
-            IAlertProfileService alertProfileService,
             ILogger<AlertService> logger)
         {
             _dbContext = dbContext;
             _notificationService = notificationService;
             _auditLogService = auditLogService;
-            _alertProfileService = alertProfileService;
             _logger = logger;
         }
 
@@ -39,89 +36,23 @@ namespace DeskGuardBackend.Services
         {
             try
             {
-                // Resolve effective thresholds from profile chain
-                var thresholds = await _alertProfileService.ResolveThresholdsForMachineAsync(machine.Id);
-                if (thresholds == null) return;
-
-                var newAlerts = new List<Alert>();
-
-                // ── Performance Thresholds ──
-                // CPU
-                if (thresholds.CpuWarningPercent.HasValue && status.CpuPercentage >= thresholds.CpuWarningPercent.Value)
-                    newAlerts.Add(CreateAlert(machine, "warning", "High CPU Usage", $"CPU usage is {status.CpuPercentage}% (warning threshold: {thresholds.CpuWarningPercent}%).", "cpu_warning"));
-                if (thresholds.CpuCriticalPercent.HasValue && status.CpuPercentage >= thresholds.CpuCriticalPercent.Value)
-                    newAlerts.Add(CreateAlert(machine, "critical", "Critical CPU Usage", $"CPU usage is {status.CpuPercentage}% (critical threshold: {thresholds.CpuCriticalPercent}%).", "cpu_critical"));
-
-                // RAM
-                if (thresholds.RamWarningPercent.HasValue && status.RamPercentage >= thresholds.RamWarningPercent.Value)
-                    newAlerts.Add(CreateAlert(machine, "warning", "High Memory Usage", $"Memory usage is {status.RamPercentage}% (warning threshold: {thresholds.RamWarningPercent}%).", "ram_warning"));
-                if (thresholds.RamCriticalPercent.HasValue && status.RamPercentage >= thresholds.RamCriticalPercent.Value)
-                    newAlerts.Add(CreateAlert(machine, "critical", "Critical Memory Usage", $"Memory usage is {status.RamPercentage}% (critical threshold: {thresholds.RamCriticalPercent}%).", "ram_critical"));
-
-                // CPU Temperature
-                if (thresholds.CpuTempWarning.HasValue && status.CpuTemperature >= thresholds.CpuTempWarning.Value)
-                    newAlerts.Add(CreateAlert(machine, "warning", "High CPU Temperature", $"CPU temperature is {status.CpuTemperature}°C (warning threshold: {thresholds.CpuTempWarning}°C).", "cpu_temp_warning"));
-                if (thresholds.CpuTempCritical.HasValue && status.CpuTemperature >= thresholds.CpuTempCritical.Value)
-                    newAlerts.Add(CreateAlert(machine, "critical", "Critical CPU Temperature", $"CPU temperature is {status.CpuTemperature}°C (critical threshold: {thresholds.CpuTempCritical}°C).", "cpu_temp_critical"));
-
-                // ── Storage Thresholds ──
-                if (thresholds.DiskWarningPercent.HasValue && status.DiskPercentage >= thresholds.DiskWarningPercent.Value)
-                    newAlerts.Add(CreateAlert(machine, "warning", "High Disk Usage", $"Disk usage is {status.DiskPercentage}% (warning threshold: {thresholds.DiskWarningPercent}%).", "disk_warning"));
-                if (thresholds.DiskCriticalPercent.HasValue && status.DiskPercentage >= thresholds.DiskCriticalPercent.Value)
-                    newAlerts.Add(CreateAlert(machine, "critical", "Critical Disk Usage", $"Disk usage is {status.DiskPercentage}% (critical threshold: {thresholds.DiskCriticalPercent}%).", "disk_critical"));
-
-                // Deduplicate: skip if an open/acknowledged alert already exists for the same metric
-                var existingAlerts = await _dbContext.Alerts
-                    .Where(a => a.MachineId == machine.Id && (a.Status == "open" || a.Status == "acknowledged"))
-                    .Select(a => a.Metadata)
+                var rules = await _dbContext.AlertRules
+                    .Where(r => r.CompanyId == machine.CompanyId && r.IsEnabled)
                     .ToListAsync();
 
-                var existingMetrics = new HashSet<string>();
-                foreach (var meta in existingAlerts)
+                foreach (var rule in rules)
                 {
-                    if (string.IsNullOrEmpty(meta)) continue;
                     try
                     {
-                        var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(meta);
-                        if (parsed != null && parsed.TryGetValue("metric", out var metric) && !string.IsNullOrEmpty(metric))
-                            existingMetrics.Add(metric);
-                    }
-                    catch { }
-                }
-
-                var savedAlerts = new List<Alert>();
-                foreach (var alert in newAlerts)
-                {
-                    var metricKey = ExtractMetricKey(alert.Metadata);
-                    if (!string.IsNullOrEmpty(metricKey) && existingMetrics.Contains(metricKey))
-                        continue;
-
-                    await _dbContext.Alerts.AddAsync(alert);
-                    savedAlerts.Add(alert);
-                }
-
-                if (savedAlerts.Count > 0)
-                {
-                    await _dbContext.SaveChangesAsync();
-
-                    foreach (var alert in savedAlerts)
-                    {
-                        await _auditLogService.LogAsync(
-                            EventType.Create.ToString(),
-                            $"Alert generated: {alert.Title} for machine: {machine.MachineUid}",
-                            machine: machine,
-                            newValues: alert
-                        );
-
-                        await _notificationService.SendAlertNotificationAsync(alert);
-
-                        if (alert.Severity == "critical" || alert.Severity == "warning")
+                        if (EvaluateRule(rule, status))
                         {
-                            await _notificationService.SendEmailNotificationAsync(alert);
+                            await CreateAlertFromRuleAsync(rule, machine, status);
                         }
                     }
-
-                    _logger.LogInformation("AlertService::EvaluateMachineAlertsAsync - Created {Count} alert(s) for machine {MachineId} using profile thresholds", savedAlerts.Count, machine.Id);
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "AlertService::EvaluateMachineAlertsAsync - Rule evaluation failed for rule ID {RuleId}, machine {MachineId}", rule.Id, machine.Id);
+                    }
                 }
             }
             catch (Exception ex)
@@ -129,37 +60,6 @@ namespace DeskGuardBackend.Services
                 _logger.LogError(ex, "AlertService::EvaluateMachineAlertsAsync - Failed to evaluate alerts for machine: {MachineId}", machine.Id);
                 throw new AlertGenerationException("Failed to evaluate alert rules for machine.", 500);
             }
-        }
-
-        private static Alert CreateAlert(Machine machine, string severity, string title, string description, string metric)
-        {
-            var metadata = new Dictionary<string, string>
-            {
-                { "metric", metric },
-                { "severity", severity }
-            };
-
-            return new Alert
-            {
-                CompanyId = machine.CompanyId ?? 0,
-                MachineId = machine.Id,
-                Severity = severity,
-                Title = title,
-                Description = description,
-                Status = AlertStatus.Open.ToString().ToLowerInvariant(),
-                Metadata = JsonSerializer.Serialize(metadata)
-            };
-        }
-
-        private static string? ExtractMetricKey(string? metadata)
-        {
-            if (string.IsNullOrEmpty(metadata)) return null;
-            try
-            {
-                var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(metadata);
-                return parsed != null && parsed.TryGetValue("metric", out var metric) ? metric : null;
-            }
-            catch { return null; }
         }
 
         public async Task<Alert> AcknowledgeAlertAsync(long alertId, long userId)
@@ -358,6 +258,90 @@ namespace DeskGuardBackend.Services
             {
                 _logger.LogError(ex, "AlertService::UpdateAlertRuleAsync failed for rule ID: {RuleId}", ruleId);
                 throw;
+            }
+        }
+
+        private static bool EvaluateRule(AlertRule rule, MachineCurrentStatus status)
+        {
+            var metricValue = GetMetricValue(rule.MetricType, status);
+            if (metricValue == null) return false;
+
+            var threshold = rule.ThresholdValue;
+
+            return rule.Condition switch
+            {
+                ">" => metricValue > threshold,
+                ">=" => metricValue >= threshold,
+                "<" => metricValue < threshold,
+                "<=" => metricValue <= threshold,
+                "==" => metricValue == threshold,
+                "!=" => metricValue != threshold,
+                _ => false
+            };
+        }
+
+        private static decimal? GetMetricValue(string metricType, MachineCurrentStatus status)
+        {
+            return metricType.ToLowerInvariant() switch
+            {
+                "cpu_percentage" => status.CpuPercentage,
+                "cpu_temperature" => status.CpuTemperature,
+                "ram_percentage" => status.RamPercentage,
+                "disk_percentage" => status.DiskPercentage,
+                "battery_percentage" => status.BatteryPercentage,
+                _ => null
+            };
+        }
+
+        private async Task CreateAlertFromRuleAsync(AlertRule rule, Machine machine, MachineCurrentStatus status)
+        {
+            try
+            {
+                var metricValue = GetMetricValue(rule.MetricType, status);
+                var alertDescription = $"{rule.MetricType.Replace('_', ' ')} is {rule.Condition} {rule.ThresholdValue} (current: {metricValue})";
+
+                var alertMetadata = new Dictionary<string, object>
+                {
+                    { "metric", rule.MetricType },
+                    { "operator", rule.Condition },
+                    { "threshold", rule.ThresholdValue },
+                    { "current_value", metricValue ?? 0 }
+                };
+
+                var alert = new Alert
+                {
+                    CompanyId = machine.CompanyId ?? 0,
+                    MachineId = machine.Id,
+                    AlertRuleId = rule.Id,
+                    Severity = rule.Severity,
+                    Title = rule.Name,
+                    Description = alertDescription,
+                    Metadata = JsonSerializer.Serialize(alertMetadata),
+                    Status = AlertStatus.Open.ToString().ToLowerInvariant()
+                };
+
+                await _dbContext.Alerts.AddAsync(alert);
+                await _dbContext.SaveChangesAsync();
+
+                await _auditLogService.LogAsync(
+                    EventType.Create.ToString(),
+                    $"Alert generated: {rule.Name} for machine: {machine.MachineUid}",
+                    machine: machine,
+                    newValues: alert
+                );
+
+                await _notificationService.SendAlertNotificationAsync(alert);
+
+                if (rule.Severity == "critical" || rule.Severity == "warning")
+                {
+                    await _notificationService.SendEmailNotificationAsync(alert);
+                }
+
+                _logger.LogInformation("Alert created from rule: {AlertId} for machine {MachineId}", alert.Id, machine.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "AlertService::CreateAlertFromRuleAsync failed for rule: {RuleId}", rule.Id);
             }
         }
     }

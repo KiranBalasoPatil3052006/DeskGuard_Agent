@@ -96,6 +96,6 @@ namespace DeskGuardAgent.Configuration
         /// True when ApiBaseUrl was never explicitly configured (empty string).
         /// In offline mode, data is collected and stored locally but never sent to an API.
         /// </summary>
-        public bool IsOfflineMode => string.IsNullOrWhiteSpace(ApiBaseUrl);
+        public bool IsOfflineMode => string.IsNullOrWhiteSpace(ApiBaseUrl) || ApiBaseUrl == "http://localhost/";
     }
 }

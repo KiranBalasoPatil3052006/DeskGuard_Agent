@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using DeskGuardBackend.Data;
 using DeskGuardBackend.Entities;
@@ -13,12 +14,12 @@ namespace DeskGuardBackend.Services
     public class DashboardService : IDashboardService
     {
         private readonly DeskGuardDbContext _dbContext;
-        private readonly ICacheService _cache;
+        private readonly IMemoryCache _cache;
         private readonly ILogger<DashboardService> _logger;
 
         public DashboardService(
             DeskGuardDbContext dbContext,
-            ICacheService cache,
+            IMemoryCache cache,
             ILogger<DashboardService> logger)
         {
             _dbContext = dbContext;
@@ -30,7 +31,7 @@ namespace DeskGuardBackend.Services
         {
             try
             {
-                // Machine counts (simple indexed COUNT queries — fast even without views)
+                // Machine counts
                 var totalMachines = await _dbContext.Machines.CountAsync(m => m.CompanyId == companyId);
                 var onlineMachines = await _dbContext.Machines.CountAsync(m => m.CompanyId == companyId && m.IsOnline);
 
@@ -51,26 +52,9 @@ namespace DeskGuardBackend.Services
                 var chartData = await GetCombinedChartDataInternalAsync(companyId, 24);
                 var alertChart = await GetAlertChartDataAsync(companyId, 7);
 
-                // Aggregated health metrics across all company machines
-                var statuses = await _dbContext.MachineCurrentStatuses
-                    .Where(s => s.Machine.CompanyId == companyId)
-                    .ToListAsync();
-
-                var cpuAvg = statuses.Where(s => s.CpuPercentage.HasValue).Average(s => (double?)s.CpuPercentage);
-                var ramAvg = statuses.Where(s => s.RamPercentage.HasValue).Average(s => (double?)s.RamPercentage);
-                var diskAvg = statuses.Where(s => s.DiskPercentage.HasValue).Average(s => (double?)s.DiskPercentage);
-
-                double? cpuPct = cpuAvg.HasValue ? Math.Round(cpuAvg.Value, 1) : null;
-                double? ramPct = ramAvg.HasValue ? Math.Round(ramAvg.Value, 1) : null;
-                double? diskPct = diskAvg.HasValue ? Math.Round(diskAvg.Value, 1) : null;
-
                 return new
                 {
                     cards = cards,
-                    cpu_percentage = cpuPct,
-                    ram_percentage = ramPct,
-                    disk_percentage = diskPct,
-                    network_percentage = (double?)null,
                     cpu_chart = chartData.Cpu,
                     ram_chart = chartData.Ram,
                     alert_chart = alertChart
@@ -133,9 +117,15 @@ namespace DeskGuardBackend.Services
             {
                 var since = DateTime.UtcNow.AddDays(-days).Date;
 
-                var alertCounts = await _dbContext.Database
-                    .SqlQuery<DailyAlertCountRow>(
-                        $"SELECT alert_date AS Date, severity AS Severity, alert_count AS Count FROM mv_daily_alerts WHERE company_id = {companyId} AND alert_date >= {since} ORDER BY alert_date")
+                var alertCounts = await _dbContext.Alerts
+                    .Where(a => a.CompanyId == companyId && a.CreatedAt >= since)
+                    .GroupBy(a => new { Date = a.CreatedAt.Date, Severity = a.Severity })
+                    .Select(g => new
+                    {
+                        g.Key.Date,
+                        g.Key.Severity,
+                        Count = g.Count()
+                    })
                     .ToListAsync();
 
                 var labels = new List<string>();
@@ -177,28 +167,11 @@ namespace DeskGuardBackend.Services
             public object Ram { get; set; } = null!;
         }
 
-        private class HourlyHealthRow
-        {
-            public long MachineId { get; set; }
-            public DateTime HourBucket { get; set; }
-            public double? AvgCpu { get; set; }
-            public double? AvgRam { get; set; }
-            public int DataPoints { get; set; }
-        }
-
-        private class DailyAlertCountRow
-        {
-            public DateTime Date { get; set; }
-            public string Severity { get; set; } = string.Empty;
-            public int Count { get; set; }
-        }
-
         private async Task<CombinedChartData> GetCombinedChartDataInternalAsync(long companyId, int hours)
         {
             var cacheKey = $"dashboard_chart_{companyId}_{hours}";
 
-            var cachedData = await _cache.GetAsync<CombinedChartData>(cacheKey);
-            if (cachedData != null)
+            if (_cache.TryGetValue<CombinedChartData>(cacheKey, out var cachedData) && cachedData != null)
             {
                 return cachedData;
             }
@@ -207,102 +180,97 @@ namespace DeskGuardBackend.Services
             {
                 var since = DateTime.UtcNow.AddHours(-hours);
 
-                // Query from materialized view mv_hourly_health (refreshed every 60s)
-                // Provides pre-aggregated hourly CPU/RAM per machine for the last 48 hours
-                var aggregatedData = await _dbContext.Database
-                    .SqlQuery<HourlyHealthRow>(
-                        $"""SELECT machine_id, hour_bucket, avg_cpu, avg_ram, data_points FROM mv_hourly_health WHERE company_id = {companyId} AND hour_bucket >= {since} ORDER BY hour_bucket""")
-                    .ToListAsync();
-
-                if (aggregatedData.Count == 0)
-                {
-                    var emptyResult = new CombinedChartData
+                // Group by Machine, Date and Hour to aggregate hourly
+                var aggregatedData = await _dbContext.HealthLogs
+                    .Where(h => h.CompanyId == companyId && h.CollectedAt >= since && (h.CpuPercentage != null || h.RamPercentage != null))
+                    .GroupBy(h => new
                     {
-                        Cpu = new { labels = Array.Empty<string>(), datasets = new object[] { new { label = "No Data", data = Array.Empty<float?>() } } },
-                        Ram = new { labels = Array.Empty<string>(), datasets = new object[] { new { label = "No Data", data = Array.Empty<float?>() } } }
-                    };
-                    await _cache.SetAsync(cacheKey, emptyResult, TimeSpan.FromMinutes(5));
-                    return emptyResult;
-                }
-
-                // Get machine names (only for machines that have data)
-                var machineIds = aggregatedData.Select(x => x.MachineId).Distinct().ToList();
-                var machines = await _dbContext.Machines
-                    .AsNoTracking()
-                    .Where(m => machineIds.Contains(m.Id))
-                    .Select(m => new { m.Id, Name = m.Hostname ?? m.DeviceName ?? $"Machine {m.Id}" })
-                    .ToDictionaryAsync(m => m.Id, m => m.Name);
-
-                // Compute overall hourly average for company-wide trend
-                var companyHourly = aggregatedData
-                    .GroupBy(x => x.HourBucket)
+                        h.MachineId,
+                        Date = h.CollectedAt!.Value.Date,
+                        Hour = h.CollectedAt!.Value.Hour
+                    })
                     .Select(g => new
                     {
-                        Hour = g.Key,
-                        AvgCpu = (float?)Math.Round(g.Average(x => x.AvgCpu) ?? 0, 1),
-                        AvgRam = (float?)Math.Round(g.Average(x => x.AvgRam) ?? 0, 1)
+                        g.Key.MachineId,
+                        g.Key.Date,
+                        g.Key.Hour,
+                        AvgCpu = g.Average(x => x.CpuPercentage),
+                        AvgRam = g.Average(x => x.RamPercentage)
                     })
-                    .OrderBy(x => x.Hour)
-                    .ToList();
+                    .OrderBy(x => x.Date)
+                    .ThenBy(x => x.Hour)
+                    .Take(500)
+                    .ToListAsync();
 
-                // Per-machine breakdown for the top 5 machines by data points
-                var topMachineIds = aggregatedData
-                    .GroupBy(x => x.MachineId)
-                    .OrderByDescending(g => g.Count())
-                    .Take(5)
-                    .Select(g => g.Key)
-                    .ToHashSet();
-
-                var topMachineData = aggregatedData.Where(x => topMachineIds.Contains(x.MachineId)).ToList();
-
-                var labels = companyHourly.Select(x => x.Hour.ToString("HH:00")).ToList();
-                var hourBuckets = companyHourly.Select(x => x.Hour).ToList();
-
-                // Build company-average dataset
-                var datasets = new List<object>
+                // Format hour buckets in memory
+                var aggregated = aggregatedData.Select(x => new
                 {
-                    new { label = "Company Avg (CPU)", data = companyHourly.Select(x => x.AvgCpu).ToArray() },
-                };
+                    x.MachineId,
+                    HourBucket = new DateTime(x.Date.Year, x.Date.Month, x.Date.Day, x.Hour, 0, 0, DateTimeKind.Utc),
+                    x.AvgCpu,
+                    x.AvgRam
+                }).ToList();
 
-                // Build per-machine CPU datasets
-                foreach (var mid in topMachineIds)
+                var machineIds = aggregated.Select(x => x.MachineId).Distinct().ToList();
+                var machines = await _dbContext.Machines
+                    .Where(m => machineIds.Contains(m.Id))
+                    .ToDictionaryAsync(m => m.Id, m => m.Hostname ?? m.DeviceName ?? $"Machine {m.Id}");
+
+                var cpuLabelsSet = new SortedSet<string>();
+                var ramLabelsSet = new SortedSet<string>();
+
+                var cpuMachineData = new Dictionary<string, Dictionary<string, float>>();
+                var ramMachineData = new Dictionary<string, Dictionary<string, float>>();
+
+                foreach (var row in aggregated)
                 {
-                    var machineName = machines.GetValueOrDefault(mid, $"Machine {mid}");
-                    var machinePoints = topMachineData.Where(x => x.MachineId == mid).ToList();
-                    var cpuData = hourBuckets.Select(h =>
+                    var timeLabel = row.HourBucket.ToString("HH:00");
+                    machines.TryGetValue(row.MachineId, out var machineName);
+                    machineName ??= "Unknown";
+
+                    if (row.AvgCpu.HasValue)
                     {
-                        var match = machinePoints.FirstOrDefault(mp => mp.HourBucket == h);
-                        return match?.AvgCpu != null ? (float?)Math.Round(match.AvgCpu.Value, 1) : null;
-                    }).ToArray();
-                    datasets.Add(new { label = $"{machineName} (CPU)", data = cpuData });
+                        cpuLabelsSet.Add(timeLabel);
+                        if (!cpuMachineData.ContainsKey(machineName)) cpuMachineData[machineName] = new Dictionary<string, float>();
+                        cpuMachineData[machineName][timeLabel] = (float)Math.Round(row.AvgCpu.Value, 1);
+                    }
+
+                    if (row.AvgRam.HasValue)
+                    {
+                        ramLabelsSet.Add(timeLabel);
+                        if (!ramMachineData.ContainsKey(machineName)) ramMachineData[machineName] = new Dictionary<string, float>();
+                        ramMachineData[machineName][timeLabel] = (float)Math.Round(row.AvgRam.Value, 1);
+                    }
                 }
 
-                // Build RAM datasets (same structure)
-                var ramDatasets = new List<object>
-                {
-                    new { label = "Company Avg (RAM)", data = companyHourly.Select(x => x.AvgRam).ToArray() },
-                };
+                var cpuLabels = cpuLabelsSet.ToList();
+                var ramLabels = ramLabelsSet.ToList();
 
-                foreach (var mid in topMachineIds)
+                var buildDatasets = new Func<Dictionary<string, Dictionary<string, float>>, List<string>, string, object[]>((machineData, labels, suffix) =>
                 {
-                    var machineName = machines.GetValueOrDefault(mid, $"Machine {mid}");
-                    var machinePoints = topMachineData.Where(x => x.MachineId == mid).ToList();
-                    var ramData = hourBuckets.Select(h =>
+                    return machineData.Select(kvp => new
                     {
-                        var match = machinePoints.FirstOrDefault(mp => mp.HourBucket == h);
-                        return match?.AvgRam != null ? (float?)Math.Round(match.AvgRam.Value, 1) : null;
+                        label = $"{kvp.Key} {suffix}",
+                        data = labels.Select(l => kvp.Value.TryGetValue(l, out var val) ? (float?)val : null).ToArray()
                     }).ToArray();
-                    ramDatasets.Add(new { label = $"{machineName} (RAM)", data = ramData });
-                }
+                });
 
                 var result = new CombinedChartData
                 {
-                    Cpu = new { labels, datasets = datasets.ToArray() },
-                    Ram = new { labels, datasets = ramDatasets.ToArray() }
+                    Cpu = new
+                    {
+                        labels = cpuLabels,
+                        datasets = cpuMachineData.Count > 0 ? buildDatasets(cpuMachineData, cpuLabels, "CPU %") : new object[] { new { label = "No Data", data = Array.Empty<float?>() } }
+                    },
+                    Ram = new
+                    {
+                        labels = ramLabels,
+                        datasets = ramMachineData.Count > 0 ? buildDatasets(ramMachineData, ramLabels, "RAM %") : new object[] { new { label = "No Data", data = Array.Empty<float?>() } }
+                    }
                 };
 
-                // Cache for 5 minutes (L1: IMemoryCache, L2: Redis if configured)
-                await _cache.SetAsync(cacheKey, result, TimeSpan.FromMinutes(5));
+                // Cache for 5 minutes
+                _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
 
                 return result;
             }

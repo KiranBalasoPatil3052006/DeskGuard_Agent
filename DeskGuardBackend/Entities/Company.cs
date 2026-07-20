@@ -34,9 +34,6 @@ namespace DeskGuardBackend.Entities
         /// <summary>Record last update timestamp (UTC).</summary>
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        /// <summary>FK to the alert profile assigned to this company.</summary>
-        public long? AlertProfileId { get; set; }
-
         // Navigation properties
         /// <summary>Users belonging to this company.</summary>
         public ICollection<User> Users { get; set; } = new List<User>();
@@ -46,8 +43,5 @@ namespace DeskGuardBackend.Entities
 
         /// <summary>Alerts generated for this company.</summary>
         public ICollection<Alert> Alerts { get; set; } = new List<Alert>();
-
-        /// <summary>Alert profile assigned to this company.</summary>
-        public AlertProfile? AlertProfile { get; set; }
     }
 }

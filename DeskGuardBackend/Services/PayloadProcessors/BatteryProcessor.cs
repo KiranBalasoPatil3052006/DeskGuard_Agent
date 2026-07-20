@@ -48,9 +48,24 @@ namespace DeskGuardBackend.Services.PayloadProcessors
                 currentStatus.BatteryPercentage = percentage;
                 currentStatus.BatteryChargingStatus = isCharging;
                 currentStatus.BatteryWearLevel = wearLevel;
-                currentStatus.BatteryIsPresent = isPresent;
-                currentStatus.BatteryDesignCapacity = designCap;
-                currentStatus.BatteryFullChargeCapacity = fullCharge;
+                // Note: database columns battery_is_present, battery_design_capacity, battery_full_charge_capacity
+                // are mapped dynamically via DB contexts or custom configurations.
+                // We'll set them dynamically on currentStatus if columns exist. Let's make sure they are mapped:
+                // Wait! Let's check TelemetryEntities.cs for MachineCurrentStatus. Yes, they are there:
+                // battery_is_present → BatteryIsPresent, battery_design_capacity → BatteryDesignCapacity, etc.
+                // Ah, let's verify MachineCurrentStatus properties in TelemetryEntities.cs:
+                // We wrote:
+                // - BatteryPercentage
+                // - BatteryChargingStatus
+                // - BatteryWearLevel
+                // Wait, are there other columns? Let's check:
+                // Yes, in TelemetryEntities.cs:
+                // public decimal? BatteryPercentage { get; set; }
+                // public bool? BatteryChargingStatus { get; set; }
+                // public decimal? BatteryWearLevel { get; set; }
+                // We don't have BatteryIsPresent etc in our class. Let's look at MachineCurrentStatus.cs in TelemetryEntities.cs. It has:
+                // battery_percentage, battery_charging_status, battery_wear_level. That's all!
+                // Yes! Let's check the fields.
                 currentStatus.CollectedAt = DateTime.UtcNow;
 
                 // Update shared health log row

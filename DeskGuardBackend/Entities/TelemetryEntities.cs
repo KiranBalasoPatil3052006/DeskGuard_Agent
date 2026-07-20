@@ -214,8 +214,6 @@ namespace DeskGuardBackend.Entities
         public decimal? CpuUsagePercentage { get; set; }
         public long? WorkingSetBytes { get; set; }
         public decimal? MemoryUsageMb { get; set; }
-        public int? ThreadCount { get; set; }
-        public string? UserName { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public Machine Machine { get; set; } = null!;
@@ -234,8 +232,6 @@ namespace DeskGuardBackend.Entities
         public string? Status { get; set; }
         public string? Manufacturer { get; set; }
         public string? DriverVersion { get; set; }
-        public string? ConnectionType { get; set; }
-        public DateTime? LastSeen { get; set; }
         public bool? HasProblem { get; set; }
         public string? ProblemDescription { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

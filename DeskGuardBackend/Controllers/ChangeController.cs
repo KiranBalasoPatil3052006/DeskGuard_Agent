@@ -9,26 +9,23 @@ using Microsoft.AspNetCore.Mvc;
 using DeskGuardBackend.DTOs.Common;
 using DeskGuardBackend.Entities;
 using DeskGuardBackend.Data;
-using DeskGuardBackend.Extensions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using DeskGuardBackend.Services.Interfaces;
 
 namespace DeskGuardBackend.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/v1")]
     public class ChangeController : ControllerBase
     {
         private readonly DeskGuardDbContext _dbContext;
-        private readonly IConfiguration _configuration;
         private readonly ILogger<ChangeController> _logger;
 
-        public ChangeController(DeskGuardDbContext dbContext, IConfiguration configuration, ILogger<ChangeController> logger)
+        public ChangeController(DeskGuardDbContext dbContext, ILogger<ChangeController> logger)
         {
             _dbContext = dbContext;
-            _configuration = configuration;
             _logger = logger;
         }
 
@@ -48,7 +45,6 @@ namespace DeskGuardBackend.Controllers
             return long.TryParse(userIdStr, out var userId) ? userId : 0;
         }
 
-        [Authorize]
         [HttpGet("changes")]
         public async Task<IActionResult> Index(
             [FromQuery] string? category = null,
@@ -100,32 +96,18 @@ namespace DeskGuardBackend.Controllers
                     .OrderByDescending(c => c.DetectedAt)
                     .Skip((page - 1) * per_page)
                     .Take(per_page)
-                    .Select(c => new
-                    {
-                        c.Id,
-                        category = c.Category,
-                        change_type = c.ChangeType,
-                        severity = c.Severity,
-                        status = c.Status,
-                        item_label = c.ItemLabel,
-                        item_identifier = c.ItemIdentifier,
-                        description = c.Description,
-                        previous_value = c.PreviousValue,
-                        new_value = c.NewValue,
-                        detected_at = c.DetectedAt,
-                        metadata = c.Metadata,
-                        machine = c.Machine != null ? new { hostname = c.Machine.Hostname, device_name = c.Machine.DeviceName } : null
-                    })
                     .ToListAsync();
 
-                return Ok(new
+                // Add helper properties or recommendation if needed matching append('recommendation')
+                var result = new PaginatedResponseDto<ChangeHistory>
                 {
-                    data = items,
-                    total,
-                    current_page = page,
-                    per_page,
-                    last_page = (int)Math.Ceiling((double)total / per_page)
-                });
+                    Data = items,
+                    Total = total,
+                    CurrentPage = page,
+                    PerPage = per_page,
+                    LastPage = (int)Math.Ceiling((double)total / per_page)
+                };
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -134,7 +116,6 @@ namespace DeskGuardBackend.Controllers
             }
         }
 
-        [Authorize]
         [HttpGet("machines/{id}/changes")]
         public async Task<IActionResult> MachineChanges(
             long id,
@@ -184,31 +165,17 @@ namespace DeskGuardBackend.Controllers
                     .OrderByDescending(c => c.DetectedAt)
                     .Skip((page - 1) * per_page)
                     .Take(per_page)
-                    .Select(c => new
-                    {
-                        c.Id,
-                        category = c.Category,
-                        change_type = c.ChangeType,
-                        severity = c.Severity,
-                        status = c.Status,
-                        item_label = c.ItemLabel,
-                        item_identifier = c.ItemIdentifier,
-                        description = c.Description,
-                        previous_value = c.PreviousValue,
-                        new_value = c.NewValue,
-                        detected_at = c.DetectedAt,
-                        metadata = c.Metadata
-                    })
                     .ToListAsync();
 
-                return Ok(ApiResponse<object>.Ok(new
+                var result = new PaginatedResponseDto<ChangeHistory>
                 {
-                    data = items,
-                    current_page = page,
-                    per_page,
-                    total,
-                    last_page = (int)Math.Ceiling((double)total / per_page)
-                }));
+                    Data = items,
+                    Total = total,
+                    CurrentPage = page,
+                    PerPage = per_page,
+                    LastPage = (int)Math.Ceiling((double)total / per_page)
+                };
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -217,7 +184,6 @@ namespace DeskGuardBackend.Controllers
             }
         }
 
-        [Authorize]
         [HttpGet("changes/recent")]
         public async Task<IActionResult> RecentChanges([FromQuery] int days = 7, [FromQuery] int limit = 10)
         {
@@ -242,7 +208,6 @@ namespace DeskGuardBackend.Controllers
             }
         }
 
-        [Authorize]
         [HttpGet("changes/summary")]
         public async Task<IActionResult> Summary([FromQuery] int days = 7)
         {
@@ -289,7 +254,6 @@ namespace DeskGuardBackend.Controllers
             }
         }
 
-        [Authorize]
         [HttpPut("changes/{id}/status")]
         public async Task<IActionResult> UpdateStatus(long id, [FromBody] JsonElement body)
         {
@@ -334,82 +298,6 @@ namespace DeskGuardBackend.Controllers
                 _logger.LogError(ex, "Failed to update change status: {ChangeId}", id);
                 return StatusCode(500, ApiResponse.Fail("Failed to update change status."));
             }
-        }
-
-        [HttpPost("agent/changes")]
-        public async Task<IActionResult> SubmitAgentChanges([FromBody] JsonElement rawPayload)
-        {
-            try
-            {
-                var machineUid = ResolveMachineUid(rawPayload);
-                if (string.IsNullOrEmpty(machineUid))
-                    return UnprocessableEntity(ApiResponse.Fail("Machine identifier is required."));
-
-                var machine = await _dbContext.Machines.FirstOrDefaultAsync(m => m.MachineUid == machineUid);
-                if (machine == null)
-                    return NotFound(ApiResponse.Fail("Machine not found. Send health payload first."));
-
-                if (!machine.CompanyId.HasValue)
-                    return UnprocessableEntity(ApiResponse.Fail("Machine has no company assigned."));
-
-                var changesProp = rawPayload.GetPropertyOrNull("changes");
-                if (changesProp == null || changesProp.Value.ValueKind != JsonValueKind.Array)
-                    return BadRequest(ApiResponse.Fail("changes (array) is required."));
-
-                var companyId = machine.CompanyId.Value;
-                var incoming = new List<ChangeHistory>();
-
-                foreach (var c in changesProp.Value.EnumerateArray())
-                {
-                    incoming.Add(new ChangeHistory
-                    {
-                        CompanyId = companyId,
-                        MachineId = machine.Id,
-                        Category = c.GetStringProperty("category") ?? "unknown",
-                        ChangeType = c.GetStringProperty("change_type") ?? "unknown",
-                        Severity = c.GetStringProperty("severity") ?? "information",
-                        ItemIdentifier = c.GetStringProperty("item_identifier"),
-                        ItemLabel = c.GetStringProperty("item_label"),
-                        PreviousValue = c.GetStringProperty("previous_value"),
-                        NewValue = c.GetStringProperty("new_value"),
-                        Description = c.GetStringProperty("description"),
-                        Status = "new",
-                        DetectedAt = DateTimeOffset.TryParse(c.GetStringProperty("detected_at"), out var dto) ? dto.UtcDateTime : DateTime.UtcNow,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    });
-                }
-
-                _dbContext.ChangeHistories.AddRange(incoming);
-                await _dbContext.SaveChangesAsync();
-
-                _logger.LogInformation("Agent changes saved for machine {MachineId} ({Count} changes)", machine.Id, incoming.Count);
-                return Ok(ApiResponse.Ok($"Changes saved ({incoming.Count} records)."));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to process agent changes");
-                return StatusCode(500, ApiResponse.Fail("Failed to process changes."));
-            }
-        }
-
-        private string ResolveMachineUid(JsonElement payload)
-        {
-            var candidates = new[]
-            {
-                payload.GetStringProperty("machineId"),
-                payload.GetStringProperty("machine_uid"),
-                payload.GetStringProperty("machineUid"),
-                payload.GetStringProperty("agentId"),
-                Request.Headers["X-Agent-Id"].ToString()
-            };
-
-            foreach (var candidate in candidates)
-            {
-                if (!string.IsNullOrEmpty(candidate)) return candidate;
-            }
-
-            return string.Empty;
         }
     }
 }

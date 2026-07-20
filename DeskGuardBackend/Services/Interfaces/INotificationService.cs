@@ -12,7 +12,5 @@ namespace DeskGuardBackend.Services.Interfaces
         Task<IEnumerable<Notification>> GetUserNotificationsAsync(long userId, bool unreadOnly = false);
         Task SendAlertNotificationAsync(Alert alert);
         Task SendEmailNotificationAsync(Alert alert);
-        Task BroadcastAlertEventAsync(string eventType, Alert alert);
-        Task BroadcastDashboardUpdateAsync(long companyId, string updateType, object? data = null);
     }
 }

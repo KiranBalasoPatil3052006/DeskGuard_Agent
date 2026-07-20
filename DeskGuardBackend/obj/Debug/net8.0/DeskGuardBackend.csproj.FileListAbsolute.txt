@@ -153,7 +153,3 @@ C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\obj\De
 C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\obj\Debug\net8.0\DeskGuardBackend.pdb
 C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\obj\Debug\net8.0\DeskGuardBackend.genruntimeconfig.cache
 C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\obj\Debug\net8.0\ref\DeskGuardBackend.dll
-C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\bin\Debug\net8.0\railway.json
-C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\bin\Debug\net8.0\Microsoft.Extensions.Caching.StackExchangeRedis.dll
-C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\bin\Debug\net8.0\Pipelines.Sockets.Unofficial.dll
-C:\Users\KIRAN BALASO PATIL\Desktop\Desk Gaurd(Services)\DeskGuardBackend\bin\Debug\net8.0\StackExchange.Redis.dll

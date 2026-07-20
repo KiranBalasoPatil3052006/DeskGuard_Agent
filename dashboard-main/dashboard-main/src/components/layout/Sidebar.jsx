@@ -7,8 +7,7 @@ import {
   FaFileAlt, 
   FaBell, 
   FaCog, 
-  FaUser,
-  FaUserPlus
+  FaUser
 } from 'react-icons/fa';
 
 const Sidebar = ({ isOpen }) => {
@@ -21,7 +20,6 @@ const Sidebar = ({ isOpen }) => {
     { path: '/alerts', name: 'Alerts', icon: <FaBell /> },
     { path: '/settings', name: 'Settings', icon: <FaCog /> },
     { path: '/profile', name: 'User Profile', icon: <FaUser /> },
-    { path: '/register', name: 'Create Account', icon: <FaUserPlus /> },
   ];
 
   return (

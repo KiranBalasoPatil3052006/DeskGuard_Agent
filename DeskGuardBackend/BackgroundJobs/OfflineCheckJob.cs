@@ -18,7 +18,6 @@ namespace DeskGuardBackend.BackgroundJobs
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<OfflineCheckJob> _logger;
         private readonly TimeSpan _checkInterval = TimeSpan.FromSeconds(60);
-        private readonly SemaphoreSlim _executionLock = new SemaphoreSlim(1, 1);
 
         public OfflineCheckJob(IServiceProvider serviceProvider, ILogger<OfflineCheckJob> logger)
         {
@@ -32,28 +31,21 @@ namespace DeskGuardBackend.BackgroundJobs
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (await _executionLock.WaitAsync(0))
+                try
                 {
-                    try
+                    using (var scope = _serviceProvider.CreateScope())
                     {
-                        using (var scope = _serviceProvider.CreateScope())
+                        var machineService = scope.ServiceProvider.GetRequiredService<IMachineService>();
+                        var offlineCount = await machineService.MarkOfflineMachinesAsync();
+                        if (offlineCount > 0)
                         {
-                            var machineService = scope.ServiceProvider.GetRequiredService<IMachineService>();
-                            var offlineCount = await machineService.MarkOfflineMachinesAsync();
-                            if (offlineCount > 0)
-                            {
-                                _logger.LogInformation("OfflineCheckJob updated: {Count} machines marked offline.", offlineCount);
-                            }
+                            _logger.LogInformation("OfflineCheckJob updated: {Count} machines marked offline.", offlineCount);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error occurred in OfflineCheckJob execution loop");
-                    }
-                    finally
-                    {
-                        _executionLock.Release();
-                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error occurred in OfflineCheckJob execution loop");
                 }
 
                 await Task.Delay(_checkInterval, stoppingToken);

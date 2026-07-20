@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -38,8 +37,9 @@ namespace DeskGuardBackend.Services
                     oldOtp.UsedAt = DateTime.UtcNow;
                 }
 
-                // Generate new 6 digit OTP using cryptographic RNG
-                var otp = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+                // Generate new 6 digit OTP
+                var random = new Random();
+                var otp = random.Next(100000, 999999).ToString();
                 var expiresAt = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
 
                 var otpCode = new OtpCode

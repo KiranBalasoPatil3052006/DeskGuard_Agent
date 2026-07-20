@@ -62,7 +62,7 @@ echo "  Hostname: {$machine->hostname}\n";
 echo "  Mobile: {$machine->employee_mobile_number}\n\n";
 
 // Now send a full health payload via the API
-$url = 'https://deskguardbackend-production.up.railway.app/api/v1/health';
+$url = 'http://127.0.0.1:8000/api/v1/health';
 
 $payload = [
     'machineId' => $machineUid,

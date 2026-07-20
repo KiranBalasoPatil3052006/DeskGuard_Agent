@@ -56,9 +56,6 @@ namespace DeskGuardBackend.Entities
         /// <summary>Timestamp of last heartbeat received from the agent.</summary>
         public DateTime? LastHeartbeatAt { get; set; }
 
-        /// <summary>FK to a custom alert profile override for this machine.</summary>
-        public long? CustomAlertProfileId { get; set; }
-
         /// <summary>Token used during initial machine activation.</summary>
         public string? ActivationToken { get; set; }
 
@@ -140,8 +137,5 @@ namespace DeskGuardBackend.Entities
 
         /// <summary>Change history records.</summary>
         public ICollection<ChangeHistory> ChangeHistories { get; set; } = new List<ChangeHistory>();
-
-        /// <summary>Custom alert profile override for this machine.</summary>
-        public AlertProfile? CustomAlertProfile { get; set; }
     }
 }

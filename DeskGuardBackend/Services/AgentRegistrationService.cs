@@ -163,15 +163,9 @@ namespace DeskGuardBackend.Services
         private static string GenerateRandomString(int length)
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            return string.Create(length, chars, (buffer, alphabet) =>
-            {
-                Span<byte> randomBytes = stackalloc byte[length];
-                RandomNumberGenerator.Fill(randomBytes);
-                for (int i = 0; i < length; i++)
-                {
-                    buffer[i] = alphabet[randomBytes[i] % alphabet.Length];
-                }
-            });
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, length)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
         private static string HashToken(string token)

@@ -49,8 +49,6 @@ namespace DeskGuardBackend.Data
         public DbSet<AlertRule> AlertRules => Set<AlertRule>();
         public DbSet<Alert> Alerts => Set<Alert>();
         public DbSet<ChangeHistory> ChangeHistories => Set<ChangeHistory>();
-        public DbSet<AlertProfile> AlertProfiles => Set<AlertProfile>();
-        public DbSet<AlertThreshold> AlertThresholds => Set<AlertThreshold>();
         public DbSet<HardwareBaseline> HardwareBaselines => Set<HardwareBaseline>();
         public DbSet<SoftwareBaseline> SoftwareBaselines => Set<SoftwareBaseline>();
         public DbSet<SecurityBaseline> SecurityBaselines => Set<SecurityBaseline>();
@@ -85,11 +83,6 @@ namespace DeskGuardBackend.Data
                 e.Property(c => c.Email).HasMaxLength(255);
                 e.Property(c => c.Phone).HasMaxLength(50);
                 e.Property(c => c.Website).HasMaxLength(255);
-
-                e.HasOne(c => c.AlertProfile)
-                    .WithMany(p => p.AssignedCompanies)
-                    .HasForeignKey(c => c.AlertProfileId)
-                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // ========== USERS ==========
@@ -97,7 +90,6 @@ namespace DeskGuardBackend.Data
             {
                 e.ToTable("users");
                 e.HasIndex(u => u.Email).IsUnique();
-                e.HasIndex(u => u.EmployeeId).IsUnique();
                 e.HasIndex(u => u.CompanyId);
                 e.HasIndex(u => u.IsActive);
                 e.HasIndex(u => u.MobileNumber);
@@ -108,17 +100,11 @@ namespace DeskGuardBackend.Data
                 e.Property(u => u.Phone).HasMaxLength(50);
                 e.Property(u => u.Avatar).HasMaxLength(255);
                 e.Property(u => u.MobileNumber).HasMaxLength(20);
-                e.Property(u => u.EmployeeId).HasMaxLength(20);
 
                 e.HasOne(u => u.Company)
                     .WithMany(c => c.Users)
                     .HasForeignKey(u => u.CompanyId)
                     .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(u => u.CreatedBy)
-                    .WithMany()
-                    .HasForeignKey(u => u.CreatedByUserId)
-                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // ========== MACHINES ==========
@@ -141,6 +127,7 @@ namespace DeskGuardBackend.Data
                 e.Property(m => m.BiosVersion).HasMaxLength(255);
                 e.Property(m => m.Processor).HasMaxLength(255);
                 e.Property(m => m.ActivationToken).HasMaxLength(255);
+                e.Property(m => m.ApiToken).HasMaxLength(255);
                 e.Property(m => m.EmployeeMobileNumber).HasMaxLength(20);
                 e.Ignore(m => m.ApiToken); // Transient — not stored in DB
 
@@ -152,11 +139,6 @@ namespace DeskGuardBackend.Data
                 e.HasOne(m => m.AssignedUser)
                     .WithMany(u => u.Machines)
                     .HasForeignKey(m => m.UserId)
-                    .OnDelete(DeleteBehavior.SetNull);
-
-                e.HasOne(m => m.CustomAlertProfile)
-                    .WithMany(p => p.CustomAssignedMachines)
-                    .HasForeignKey(m => m.CustomAlertProfileId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
 
@@ -199,7 +181,6 @@ namespace DeskGuardBackend.Data
                 e.HasIndex(h => h.CompanyId);
                 e.HasIndex(h => h.CollectedAt);
                 e.HasIndex(h => new { h.MachineId, h.CollectedAt }); // Performance chart queries
-                e.HasIndex(h => new { h.CompanyId, h.CollectedAt }); // Dashboard aggregation queries
                 e.Property(h => h.CpuPercentage).HasPrecision(5, 2);
                 e.Property(h => h.CpuTemperature).HasPrecision(5, 2);
                 e.Property(h => h.CpuClockSpeed).HasPrecision(10, 2);
@@ -277,7 +258,6 @@ namespace DeskGuardBackend.Data
             {
                 e.ToTable("windows_services");
                 e.HasIndex(s => s.MachineId);
-                e.HasIndex(s => new { s.MachineId, s.ServiceName }); // Service queries by machine
                 e.HasOne(s => s.Machine).WithMany(m => m.WindowsServices)
                     .HasForeignKey(s => s.MachineId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -297,7 +277,6 @@ namespace DeskGuardBackend.Data
                 e.ToTable("event_logs");
                 e.HasIndex(l => l.MachineId);
                 e.HasIndex(l => l.TimeGenerated);
-                e.HasIndex(l => new { l.MachineId, l.TimeGenerated }); // Machine event log queries
                 e.HasOne(l => l.Machine).WithMany(m => m.EventLogs)
                     .HasForeignKey(l => l.MachineId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -316,7 +295,6 @@ namespace DeskGuardBackend.Data
             {
                 e.ToTable("process_logs");
                 e.HasIndex(p => p.MachineId);
-                e.HasIndex(p => new { p.MachineId, p.CpuUsagePercentage }); // Top processes queries
                 e.Property(p => p.CpuUsagePercentage).HasPrecision(10, 4);
                 e.Property(p => p.MemoryUsageMb).HasPrecision(10, 2);
                 e.HasOne(p => p.Machine).WithMany(m => m.ProcessLogs)
@@ -346,7 +324,6 @@ namespace DeskGuardBackend.Data
             {
                 e.ToTable("machine_network_adapters");
                 e.HasIndex(n => n.MachineId);
-                e.HasIndex(n => new { n.MachineId, n.AdapterName }); // Network adapter queries by machine
                 e.HasOne(n => n.Machine).WithMany(m => m.NetworkAdapters)
                     .HasForeignKey(n => n.MachineId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -383,7 +360,6 @@ namespace DeskGuardBackend.Data
                 e.HasIndex(a => a.Status);
                 e.HasIndex(a => a.CreatedAt);
                 e.HasIndex(a => new { a.CompanyId, a.Status, a.CreatedAt }); // Dashboard alert queries
-                e.HasIndex(a => new { a.MachineId, a.CreatedAt }); // Machine alerts paginated queries
                 e.Property(a => a.Title).HasMaxLength(255).IsRequired();
                 e.Property(a => a.Severity).HasMaxLength(255);
                 e.Property(a => a.Status).HasMaxLength(255);
@@ -443,35 +419,6 @@ namespace DeskGuardBackend.Data
                 e.ToTable("configuration_baselines");
                 e.HasIndex(b => b.MachineId);
                 e.HasOne(b => b.Machine).WithMany().HasForeignKey(b => b.MachineId).OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // ========== ALERT PROFILES ==========
-            modelBuilder.Entity<AlertProfile>(e =>
-            {
-                e.ToTable("alert_profiles");
-                e.HasIndex(p => p.Name);
-                e.Property(p => p.Name).HasMaxLength(255).IsRequired();
-
-                e.HasOne(p => p.Threshold)
-                    .WithOne(t => t.Profile)
-                    .HasForeignKey<AlertThreshold>(t => t.ProfileId)
-                    .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // ========== ALERT THRESHOLDS ==========
-            modelBuilder.Entity<AlertThreshold>(e =>
-            {
-                e.ToTable("alert_thresholds");
-                e.HasIndex(t => t.ProfileId).IsUnique();
-
-                e.Property(t => t.CpuWarningPercent).HasPrecision(5, 2);
-                e.Property(t => t.CpuCriticalPercent).HasPrecision(5, 2);
-                e.Property(t => t.RamWarningPercent).HasPrecision(5, 2);
-                e.Property(t => t.RamCriticalPercent).HasPrecision(5, 2);
-                e.Property(t => t.CpuTempWarning).HasPrecision(5, 2);
-                e.Property(t => t.CpuTempCritical).HasPrecision(5, 2);
-                e.Property(t => t.DiskWarningPercent).HasPrecision(5, 2);
-                e.Property(t => t.DiskCriticalPercent).HasPrecision(5, 2);
             });
 
             // ========== REPORTS ==========
@@ -558,7 +505,6 @@ namespace DeskGuardBackend.Data
                 e.ToTable("model_has_roles");
                 e.HasKey(ur => new { ur.RoleId, ur.UserId, ur.ModelType });
                 e.Property(ur => ur.UserId).HasColumnName("model_id");
-                e.HasQueryFilter(ur => ur.User!.DeletedAt == null); // Match User soft-delete filter
 
                 e.HasOne(ur => ur.Role).WithMany(r => r.UserRoles)
                     .HasForeignKey(ur => ur.RoleId).OnDelete(DeleteBehavior.Cascade);
@@ -583,7 +529,7 @@ namespace DeskGuardBackend.Data
         }
 
         /// <summary>
-        /// Seeds initial data: default roles and default profiles.
+        /// Seeds initial data: default roles and a default admin user.
         /// </summary>
         private static void SeedData(ModelBuilder modelBuilder)
         {
@@ -591,25 +537,7 @@ namespace DeskGuardBackend.Data
             modelBuilder.Entity<Role>().HasData(
                 new Role { Id = 1, Name = "Super Admin", GuardName = "web" },
                 new Role { Id = 2, Name = "Company Admin", GuardName = "web" },
-                new Role { Id = 3, Name = "Support Technician", GuardName = "web" },
-                new Role { Id = 4, Name = "Admin", GuardName = "web" }
-            );
-
-            var now = new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc);
-
-            modelBuilder.Entity<AlertProfile>().HasData(
-                new AlertProfile { Id = 1, Name = "Default Profile", Description = "Standard monitoring thresholds for general office workstations.", IsDefault = true, CreatedAt = now, UpdatedAt = now },
-                new AlertProfile { Id = 2, Name = "Office Workstations", Description = "Optimized for typical office productivity workloads.", IsDefault = false, CreatedAt = now, UpdatedAt = now },
-                new AlertProfile { Id = 3, Name = "Development Machines", Description = "Relaxed thresholds for developer machines with high resource usage.", IsDefault = false, CreatedAt = now, UpdatedAt = now }
-            );
-
-            modelBuilder.Entity<AlertThreshold>().HasData(
-                // Default Profile thresholds (id=1)
-                new AlertThreshold { Id = 1, ProfileId = 1, CpuWarningPercent = 80, CpuCriticalPercent = 95, CpuWarningDurationMinutes = 5, RamWarningPercent = 80, RamCriticalPercent = 95, RamWarningDurationMinutes = 5, CpuTempWarning = 80, CpuTempCritical = 90, DiskWarningPercent = 85, DiskCriticalPercent = 95, DiskSmartWarningEnabled = true, DiskSmartCriticalEnabled = true, OfflineWarningMinutes = 10, OfflineCriticalMinutes = 30, FailedLoginWarningCount = 5, FailedLoginCriticalCount = 15, NetworkDisconnectWarningCount = 3, CreatedAt = now, UpdatedAt = now },
-                // Office Workstations thresholds (id=2)
-                new AlertThreshold { Id = 2, ProfileId = 2, CpuWarningPercent = 75, CpuCriticalPercent = 90, CpuWarningDurationMinutes = 5, RamWarningPercent = 75, RamCriticalPercent = 90, RamWarningDurationMinutes = 5, CpuTempWarning = 75, CpuTempCritical = 85, DiskWarningPercent = 85, DiskCriticalPercent = 95, DiskSmartWarningEnabled = true, DiskSmartCriticalEnabled = true, OfflineWarningMinutes = 15, OfflineCriticalMinutes = 45, FailedLoginWarningCount = 5, FailedLoginCriticalCount = 10, NetworkDisconnectWarningCount = 3, CreatedAt = now, UpdatedAt = now },
-                // Development Machines thresholds (id=3)
-                new AlertThreshold { Id = 3, ProfileId = 3, CpuWarningPercent = 90, CpuCriticalPercent = 98, CpuWarningDurationMinutes = 10, RamWarningPercent = 85, RamCriticalPercent = 97, RamWarningDurationMinutes = 10, CpuTempWarning = 85, CpuTempCritical = 95, DiskWarningPercent = 90, DiskCriticalPercent = 97, DiskSmartWarningEnabled = true, DiskSmartCriticalEnabled = true, OfflineWarningMinutes = 10, OfflineCriticalMinutes = 30, FailedLoginWarningCount = 3, FailedLoginCriticalCount = 10, NetworkDisconnectWarningCount = 5, CreatedAt = now, UpdatedAt = now }
+                new Role { Id = 3, Name = "Support Technician", GuardName = "web" }
             );
         }
 

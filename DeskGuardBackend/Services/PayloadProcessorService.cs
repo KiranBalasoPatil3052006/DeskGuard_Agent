@@ -28,20 +28,15 @@ namespace DeskGuardBackend.Services
 
         public async Task ProcessAsync(Machine machine, JsonElement payload)
         {
+            using var transaction = await _dbContext.Database.BeginTransactionAsync();
             try
             {
-                // Create ONE shared HealthLog row for this payload cycle.
-                // Use the agent-reported timestamp when available; fall back to server time.
-                DateTime agentTimestamp = payload.TryGetProperty("timestamp", out var tsEl) &&
-                    tsEl.ValueKind == JsonValueKind.String &&
-                    DateTime.TryParse(tsEl.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedTs)
-                    ? parsedTs : DateTime.UtcNow;
-
+                // Create ONE shared HealthLog row for this payload cycle
                 var healthLog = new HealthLog
                 {
                     CompanyId = machine.CompanyId,
                     MachineId = machine.Id,
-                    CollectedAt = agentTimestamp
+                    CollectedAt = DateTime.UtcNow
                 };
 
                 await _dbContext.HealthLogs.AddAsync(healthLog);
@@ -60,11 +55,13 @@ namespace DeskGuardBackend.Services
                     }
                 }
 
+                await transaction.CommitAsync();
                 _logger.LogInformation("PayloadProcessorService: Successfully processed telemetry payload for machine {MachineId}", machine.Id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "PayloadProcessorService: Failed to process payload for machine {MachineId}", machine.Id);
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "PayloadProcessorService: Transaction rolled back due to error processing payload for machine {MachineId}", machine.Id);
                 throw;
             }
         }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -130,38 +129,35 @@ namespace DeskGuardBackend.Services
                 var lastPage = (int)Math.Ceiling((double)total / perPage);
                 page = Math.Min(Math.Max(1, page), Math.Max(1, lastPage));
 
-                var machines = await query
+                var items = await query
                     .OrderByDescending(m => m.LastHeartbeatAt)
                     .Skip((page - 1) * perPage)
                     .Take(perPage)
-                    .ToListAsync();
-
-                var items = machines.Select(m => new MachineResponseDto
-                {
-                    Id = m.Id,
-                    CompanyId = m.CompanyId,
-                    UserId = m.UserId,
-                    MachineUid = m.MachineUid,
-                    Hostname = m.Hostname,
-                    DeviceName = m.DeviceName,
-                    OperatingSystem = m.OperatingSystem,
-                    Model = m.Model,
-                    IsOnline = m.IsOnline,
-                    LastHeartbeatAt = m.LastHeartbeatAt,
-                    IsActive = m.IsActive,
-                    EmployeeMobileNumber = m.EmployeeMobileNumber,
-                    CurrentStatus = m.CurrentStatus != null ? new MachineCurrentStatusDto
+                    .Select(m => new MachineResponseDto
                     {
-                        CpuPercentage = m.CurrentStatus.CpuPercentage,
-                        CpuTemperature = m.CurrentStatus.CpuTemperature,
-                        RamPercentage = m.CurrentStatus.RamPercentage,
-                        DiskPercentage = m.CurrentStatus.DiskPercentage,
-                        OnlineStatus = m.CurrentStatus.OnlineStatus,
-                        NetworkInterfaces = m.CurrentStatus.NetworkInterfaces != null
-                            ? JsonSerializer.Deserialize<object>(m.CurrentStatus.NetworkInterfaces)
-                            : null
-                    } : null
-                }).ToList();
+                        Id = m.Id,
+                        CompanyId = m.CompanyId,
+                        UserId = m.UserId,
+                        MachineUid = m.MachineUid,
+                        Hostname = m.Hostname,
+                        DeviceName = m.DeviceName,
+                        OperatingSystem = m.OperatingSystem,
+                        Manufacturer = m.Manufacturer,
+                        Model = m.Model,
+                        IsOnline = m.IsOnline,
+                        LastHeartbeatAt = m.LastHeartbeatAt,
+                        IsActive = m.IsActive,
+                        EmployeeMobileNumber = m.EmployeeMobileNumber,
+                        CurrentStatus = m.CurrentStatus != null ? new MachineCurrentStatusDto
+                        {
+                            CpuPercentage = m.CurrentStatus.CpuPercentage,
+                            CpuTemperature = m.CurrentStatus.CpuTemperature,
+                            RamPercentage = m.CurrentStatus.RamPercentage,
+                            DiskPercentage = m.CurrentStatus.DiskPercentage,
+                            OnlineStatus = m.CurrentStatus.OnlineStatus
+                        } : null
+                    })
+                    .ToListAsync();
 
                 return new PaginatedResponseDto<MachineResponseDto>
                 {
@@ -290,10 +286,16 @@ namespace DeskGuardBackend.Services
             {
                 var threshold = DateTime.UtcNow.AddMinutes(-OfflineThresholdMinutes);
 
-                var count = await _dbContext.Machines
+                var offlineMachines = await _dbContext.Machines
                     .Where(m => m.IsOnline && (m.LastHeartbeatAt == null || m.LastHeartbeatAt < threshold))
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(m => m.IsOnline, false));
+                    .ToListAsync();
 
+                foreach (var machine in offlineMachines)
+                {
+                    machine.IsOnline = false;
+                }
+
+                var count = await _dbContext.SaveChangesAsync();
                 if (count > 0)
                 {
                     _logger.LogInformation("{Count} machines marked as offline", count);

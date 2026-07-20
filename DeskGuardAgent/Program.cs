@@ -95,7 +95,7 @@ namespace DeskGuardAgent
                     Log.Warning("ApiBaseUrl is not configured in appsettings.json. " +
                         "The agent will start in offline/test mode. " +
                         "Collectors will run and log data, but API calls will fail gracefully.");
-                    agentSettings.ApiBaseUrl = "https://deskguardbackend-production.up.railway.app/";
+                    agentSettings.ApiBaseUrl = "http://localhost/";
                 }
 
                 // Register the HttpClient for API communication.

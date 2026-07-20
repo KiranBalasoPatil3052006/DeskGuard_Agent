@@ -35,9 +35,6 @@ namespace DeskGuardBackend.Entities
         public decimal? BatteryPercentage { get; set; }
         public bool? BatteryChargingStatus { get; set; }
         public decimal? BatteryWearLevel { get; set; }
-        public bool? BatteryIsPresent { get; set; }
-        public long? BatteryDesignCapacity { get; set; }
-        public long? BatteryFullChargeCapacity { get; set; }
 
         // Network metrics
         public long? NetworkReceivedBytes { get; set; }

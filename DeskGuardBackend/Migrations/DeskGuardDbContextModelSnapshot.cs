@@ -124,82 +124,10 @@ namespace DeskGuardBackend.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_alerts_status");
 
-                    b.HasIndex("MachineId", "CreatedAt")
-                        .HasDatabaseName("ix_alerts_machine_id_created_at");
-
                     b.HasIndex("CompanyId", "Status", "CreatedAt")
                         .HasDatabaseName("ix_alerts_company_id_status_created_at");
 
                     b.ToTable("alerts", (string)null);
-                });
-
-            modelBuilder.Entity("DeskGuardBackend.Entities.AlertProfile", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_default");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_alert_profiles");
-
-                    b.HasIndex("Name")
-                        .HasDatabaseName("ix_alert_profiles_name");
-
-                    b.ToTable("alert_profiles", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1L,
-                            CreatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Standard monitoring thresholds for general office workstations.",
-                            IsDefault = true,
-                            Name = "Default Profile",
-                            UpdatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2L,
-                            CreatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Optimized for typical office productivity workloads.",
-                            IsDefault = false,
-                            Name = "Office Workstations",
-                            UpdatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3L,
-                            CreatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Relaxed thresholds for developer machines with high resource usage.",
-                            IsDefault = false,
-                            Name = "Development Machines",
-                            UpdatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("DeskGuardBackend.Entities.AlertRule", b =>
@@ -263,187 +191,6 @@ namespace DeskGuardBackend.Migrations
                         .HasDatabaseName("ix_alert_rules_company_id");
 
                     b.ToTable("alert_rules", (string)null);
-                });
-
-            modelBuilder.Entity("DeskGuardBackend.Entities.AlertThreshold", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<decimal?>("CpuCriticalPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("cpu_critical_percent");
-
-                    b.Property<decimal?>("CpuTempCritical")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("cpu_temp_critical");
-
-                    b.Property<decimal?>("CpuTempWarning")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("cpu_temp_warning");
-
-                    b.Property<int?>("CpuWarningDurationMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("cpu_warning_duration_minutes");
-
-                    b.Property<decimal?>("CpuWarningPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("cpu_warning_percent");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<decimal?>("DiskCriticalPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("disk_critical_percent");
-
-                    b.Property<bool?>("DiskSmartCriticalEnabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("disk_smart_critical_enabled");
-
-                    b.Property<bool?>("DiskSmartWarningEnabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("disk_smart_warning_enabled");
-
-                    b.Property<decimal?>("DiskWarningPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("disk_warning_percent");
-
-                    b.Property<int?>("FailedLoginCriticalCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("failed_login_critical_count");
-
-                    b.Property<int?>("FailedLoginWarningCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("failed_login_warning_count");
-
-                    b.Property<int?>("NetworkDisconnectWarningCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("network_disconnect_warning_count");
-
-                    b.Property<int?>("OfflineCriticalMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("offline_critical_minutes");
-
-                    b.Property<int?>("OfflineWarningMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("offline_warning_minutes");
-
-                    b.Property<long>("ProfileId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("profile_id");
-
-                    b.Property<decimal?>("RamCriticalPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("ram_critical_percent");
-
-                    b.Property<int?>("RamWarningDurationMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("ram_warning_duration_minutes");
-
-                    b.Property<decimal?>("RamWarningPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("ram_warning_percent");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_alert_thresholds");
-
-                    b.HasIndex("ProfileId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_alert_thresholds_profile_id");
-
-                    b.ToTable("alert_thresholds", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1L,
-                            CpuCriticalPercent = 95m,
-                            CpuTempCritical = 90m,
-                            CpuTempWarning = 80m,
-                            CpuWarningDurationMinutes = 5,
-                            CpuWarningPercent = 80m,
-                            CreatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiskCriticalPercent = 95m,
-                            DiskSmartCriticalEnabled = true,
-                            DiskSmartWarningEnabled = true,
-                            DiskWarningPercent = 85m,
-                            FailedLoginCriticalCount = 15,
-                            FailedLoginWarningCount = 5,
-                            NetworkDisconnectWarningCount = 3,
-                            OfflineCriticalMinutes = 30,
-                            OfflineWarningMinutes = 10,
-                            ProfileId = 1L,
-                            RamCriticalPercent = 95m,
-                            RamWarningDurationMinutes = 5,
-                            RamWarningPercent = 80m,
-                            UpdatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2L,
-                            CpuCriticalPercent = 90m,
-                            CpuTempCritical = 85m,
-                            CpuTempWarning = 75m,
-                            CpuWarningDurationMinutes = 5,
-                            CpuWarningPercent = 75m,
-                            CreatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiskCriticalPercent = 95m,
-                            DiskSmartCriticalEnabled = true,
-                            DiskSmartWarningEnabled = true,
-                            DiskWarningPercent = 85m,
-                            FailedLoginCriticalCount = 10,
-                            FailedLoginWarningCount = 5,
-                            NetworkDisconnectWarningCount = 3,
-                            OfflineCriticalMinutes = 45,
-                            OfflineWarningMinutes = 15,
-                            ProfileId = 2L,
-                            RamCriticalPercent = 90m,
-                            RamWarningDurationMinutes = 5,
-                            RamWarningPercent = 75m,
-                            UpdatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3L,
-                            CpuCriticalPercent = 98m,
-                            CpuTempCritical = 95m,
-                            CpuTempWarning = 85m,
-                            CpuWarningDurationMinutes = 10,
-                            CpuWarningPercent = 90m,
-                            CreatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiskCriticalPercent = 97m,
-                            DiskSmartCriticalEnabled = true,
-                            DiskSmartWarningEnabled = true,
-                            DiskWarningPercent = 90m,
-                            FailedLoginCriticalCount = 10,
-                            FailedLoginWarningCount = 3,
-                            NetworkDisconnectWarningCount = 5,
-                            OfflineCriticalMinutes = 30,
-                            OfflineWarningMinutes = 10,
-                            ProfileId = 3L,
-                            RamCriticalPercent = 97m,
-                            RamWarningDurationMinutes = 10,
-                            RamWarningPercent = 85m,
-                            UpdatedAt = new DateTime(2026, 7, 15, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("DeskGuardBackend.Entities.AntivirusStatus", b =>
@@ -673,10 +420,6 @@ namespace DeskGuardBackend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("address");
 
-                    b.Property<long?>("AlertProfileId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("alert_profile_id");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -712,9 +455,6 @@ namespace DeskGuardBackend.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_companies");
-
-                    b.HasIndex("AlertProfileId")
-                        .HasDatabaseName("ix_companies_alert_profile_id");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -924,9 +664,6 @@ namespace DeskGuardBackend.Migrations
 
                     b.HasIndex("TimeGenerated")
                         .HasDatabaseName("ix_event_logs_time_generated");
-
-                    b.HasIndex("MachineId", "TimeGenerated")
-                        .HasDatabaseName("ix_event_logs_machine_id_time_generated");
 
                     b.ToTable("event_logs", (string)null);
                 });
@@ -1241,9 +978,6 @@ namespace DeskGuardBackend.Migrations
                     b.HasIndex("MachineId")
                         .HasDatabaseName("ix_health_logs_machine_id");
 
-                    b.HasIndex("CompanyId", "CollectedAt")
-                        .HasDatabaseName("ix_health_logs_company_id_collected_at");
-
                     b.HasIndex("MachineId", "CollectedAt")
                         .HasDatabaseName("ix_health_logs_machine_id_collected_at");
 
@@ -1349,10 +1083,6 @@ namespace DeskGuardBackend.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<long?>("CustomAlertProfileId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("custom_alert_profile_id");
-
                     b.Property<string>("DeviceName")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
@@ -1434,9 +1164,6 @@ namespace DeskGuardBackend.Migrations
                     b.HasIndex("CompanyId")
                         .HasDatabaseName("ix_machines_company_id");
 
-                    b.HasIndex("CustomAlertProfileId")
-                        .HasDatabaseName("ix_machines_custom_alert_profile_id");
-
                     b.HasIndex("IsOnline")
                         .HasDatabaseName("ix_machines_is_online");
 
@@ -1462,10 +1189,6 @@ namespace DeskGuardBackend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("ConnectionType")
-                        .HasColumnType("text")
-                        .HasColumnName("connection_type");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1489,10 +1212,6 @@ namespace DeskGuardBackend.Migrations
                     b.Property<bool?>("HasProblem")
                         .HasColumnType("boolean")
                         .HasColumnName("has_problem");
-
-                    b.Property<DateTime?>("LastSeen")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_seen");
 
                     b.Property<long>("MachineId")
                         .HasColumnType("bigint")
@@ -1543,18 +1262,6 @@ namespace DeskGuardBackend.Migrations
                     b.Property<bool?>("BatteryChargingStatus")
                         .HasColumnType("boolean")
                         .HasColumnName("battery_charging_status");
-
-                    b.Property<long?>("BatteryDesignCapacity")
-                        .HasColumnType("bigint")
-                        .HasColumnName("battery_design_capacity");
-
-                    b.Property<long?>("BatteryFullChargeCapacity")
-                        .HasColumnType("bigint")
-                        .HasColumnName("battery_full_charge_capacity");
-
-                    b.Property<bool?>("BatteryIsPresent")
-                        .HasColumnType("boolean")
-                        .HasColumnName("battery_is_present");
 
                     b.Property<decimal?>("BatteryPercentage")
                         .HasPrecision(5, 2)
@@ -1793,9 +1500,6 @@ namespace DeskGuardBackend.Migrations
 
                     b.HasIndex("MachineId")
                         .HasDatabaseName("ix_machine_network_adapters_machine_id");
-
-                    b.HasIndex("MachineId", "AdapterName")
-                        .HasDatabaseName("ix_machine_network_adapters_machine_id_adapter_name");
 
                     b.ToTable("machine_network_adapters", (string)null);
                 });
@@ -2094,17 +1798,9 @@ namespace DeskGuardBackend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("process_name");
 
-                    b.Property<int?>("ThreadCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("thread_count");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
-
-                    b.Property<string>("UserName")
-                        .HasColumnType("text")
-                        .HasColumnName("user_name");
 
                     b.Property<long?>("WorkingSetBytes")
                         .HasColumnType("bigint")
@@ -2115,9 +1811,6 @@ namespace DeskGuardBackend.Migrations
 
                     b.HasIndex("MachineId")
                         .HasDatabaseName("ix_process_logs_machine_id");
-
-                    b.HasIndex("MachineId", "CpuUsagePercentage")
-                        .HasDatabaseName("ix_process_logs_machine_id_cpu_usage_percentage");
 
                     b.ToTable("process_logs", (string)null);
                 });
@@ -2270,34 +1963,26 @@ namespace DeskGuardBackend.Migrations
                         new
                         {
                             Id = 1L,
-                            CreatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(971),
+                            CreatedAt = new DateTime(2026, 7, 12, 6, 15, 42, 689, DateTimeKind.Utc).AddTicks(1455),
                             GuardName = "web",
                             Name = "Super Admin",
-                            UpdatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(977)
+                            UpdatedAt = new DateTime(2026, 7, 12, 6, 15, 42, 689, DateTimeKind.Utc).AddTicks(1461)
                         },
                         new
                         {
                             Id = 2L,
-                            CreatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(1060),
+                            CreatedAt = new DateTime(2026, 7, 12, 6, 15, 42, 689, DateTimeKind.Utc).AddTicks(1472),
                             GuardName = "web",
                             Name = "Company Admin",
-                            UpdatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(1061)
+                            UpdatedAt = new DateTime(2026, 7, 12, 6, 15, 42, 689, DateTimeKind.Utc).AddTicks(1472)
                         },
                         new
                         {
                             Id = 3L,
-                            CreatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(1066),
+                            CreatedAt = new DateTime(2026, 7, 12, 6, 15, 42, 689, DateTimeKind.Utc).AddTicks(1476),
                             GuardName = "web",
                             Name = "Support Technician",
-                            UpdatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(1067)
-                        },
-                        new
-                        {
-                            Id = 4L,
-                            CreatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(1090),
-                            GuardName = "web",
-                            Name = "Admin",
-                            UpdatedAt = new DateTime(2026, 7, 15, 8, 12, 15, 230, DateTimeKind.Utc).AddTicks(1091)
+                            UpdatedAt = new DateTime(2026, 7, 12, 6, 15, 42, 689, DateTimeKind.Utc).AddTicks(1477)
                         });
                 });
 
@@ -2613,10 +2298,6 @@ namespace DeskGuardBackend.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<long?>("CreatedByUserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_by_user_id");
-
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -2625,11 +2306,6 @@ namespace DeskGuardBackend.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("email");
-
-                    b.Property<string>("EmployeeId")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("employee_id");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -2677,16 +2353,9 @@ namespace DeskGuardBackend.Migrations
                     b.HasIndex("CompanyId")
                         .HasDatabaseName("ix_users_company_id");
 
-                    b.HasIndex("CreatedByUserId")
-                        .HasDatabaseName("ix_users_created_by_user_id");
-
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("ix_users_email");
-
-                    b.HasIndex("EmployeeId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_users_employee_id");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("ix_users_is_active");
@@ -2767,9 +2436,6 @@ namespace DeskGuardBackend.Migrations
 
                     b.HasIndex("MachineId")
                         .HasDatabaseName("ix_windows_services_machine_id");
-
-                    b.HasIndex("MachineId", "ServiceName")
-                        .HasDatabaseName("ix_windows_services_machine_id_service_name");
 
                     b.ToTable("windows_services", (string)null);
                 });
@@ -2892,18 +2558,6 @@ namespace DeskGuardBackend.Migrations
                     b.Navigation("Company");
                 });
 
-            modelBuilder.Entity("DeskGuardBackend.Entities.AlertThreshold", b =>
-                {
-                    b.HasOne("DeskGuardBackend.Entities.AlertProfile", "Profile")
-                        .WithOne("Threshold")
-                        .HasForeignKey("DeskGuardBackend.Entities.AlertThreshold", "ProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_alert_thresholds_alert_profiles_profile_id");
-
-                    b.Navigation("Profile");
-                });
-
             modelBuilder.Entity("DeskGuardBackend.Entities.AntivirusStatus", b =>
                 {
                     b.HasOne("DeskGuardBackend.Entities.Machine", "Machine")
@@ -2953,17 +2607,6 @@ namespace DeskGuardBackend.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Machine");
-                });
-
-            modelBuilder.Entity("DeskGuardBackend.Entities.Company", b =>
-                {
-                    b.HasOne("DeskGuardBackend.Entities.AlertProfile", "AlertProfile")
-                        .WithMany("AssignedCompanies")
-                        .HasForeignKey("AlertProfileId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_companies_alert_profiles_alert_profile_id");
-
-                    b.Navigation("AlertProfile");
                 });
 
             modelBuilder.Entity("DeskGuardBackend.Entities.ConfigurationBaseline", b =>
@@ -3089,12 +2732,6 @@ namespace DeskGuardBackend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_machines_companies_company_id");
 
-                    b.HasOne("DeskGuardBackend.Entities.AlertProfile", "CustomAlertProfile")
-                        .WithMany("CustomAssignedMachines")
-                        .HasForeignKey("CustomAlertProfileId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_machines_alert_profiles_custom_alert_profile_id");
-
                     b.HasOne("DeskGuardBackend.Entities.User", "AssignedUser")
                         .WithMany("Machines")
                         .HasForeignKey("UserId")
@@ -3104,8 +2741,6 @@ namespace DeskGuardBackend.Migrations
                     b.Navigation("AssignedUser");
 
                     b.Navigation("Company");
-
-                    b.Navigation("CustomAlertProfile");
                 });
 
             modelBuilder.Entity("DeskGuardBackend.Entities.MachineConnectedDevice", b =>
@@ -3298,15 +2933,7 @@ namespace DeskGuardBackend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("fk_users_companies_company_id");
 
-                    b.HasOne("DeskGuardBackend.Entities.User", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_users_users_created_by_user_id");
-
                     b.Navigation("Company");
-
-                    b.Navigation("CreatedBy");
                 });
 
             modelBuilder.Entity("DeskGuardBackend.Entities.UserRole", b =>
@@ -3352,15 +2979,6 @@ namespace DeskGuardBackend.Migrations
                         .HasConstraintName("fk_windows_updates_machines_machine_id");
 
                     b.Navigation("Machine");
-                });
-
-            modelBuilder.Entity("DeskGuardBackend.Entities.AlertProfile", b =>
-                {
-                    b.Navigation("AssignedCompanies");
-
-                    b.Navigation("CustomAssignedMachines");
-
-                    b.Navigation("Threshold");
                 });
 
             modelBuilder.Entity("DeskGuardBackend.Entities.AlertRule", b =>

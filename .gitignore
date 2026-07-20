@@ -5,10 +5,6 @@ DeskGuardAgent/bin/
 DeskGuardAgent/obj/
 DeskGuardAgent/Logs/
 DeskGuardAgent/Storage/
-agent2/DeskGuardAgent/bin/
-agent2/DeskGuardAgent/obj/
-agent2/DeskGuardAgent/Logs/
-agent2/DeskGuardAgent/Storage/
 *.user
 *.suo
 *.vs/
@@ -39,9 +35,6 @@ dashboard-main/deskguard-frontend/node_modules/
 dashboard-main/deskguard-frontend/dist/
 dashboard-main/deskguard-frontend/dist-ssr/
 dashboard-main/deskguard-frontend/*.local
-
-# Zipped backups (large files)
-*.zip
 
 # Stray nested copy (if kept)
 dashboard-main/dashboard-main/node_modules/

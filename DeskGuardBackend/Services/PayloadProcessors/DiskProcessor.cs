@@ -22,66 +22,64 @@ namespace DeskGuardBackend.Services.PayloadProcessors
 
         public async Task ProcessAsync(Machine machine, JsonElement payload, HealthLog healthLog)
         {
-            var disksProp = payload.GetPropertyOrNull("disks");
-            if (disksProp == null || disksProp.Value.ValueKind != JsonValueKind.Array) return;
-
-            var disks = disksProp.Value;
-
-            decimal? aggregateUsage = null;
-            long? aggregateFree = null;
-            long? aggregateTotal = null;
-            long? aggregateUsed = null;
-            bool? aggregateHealth = null;
-
-            // Pre-load existing disks for this machine to avoid N+1 read queries.
-            var existingDisks = await _dbContext.MachineDisks
-                .Where(d => d.MachineId == machine.Id)
-                .ToListAsync();
-
-            foreach (var disk in disks.EnumerateArray())
+            try
             {
-                var driveLetter = disk.GetStringProperty("driveName") ?? disk.GetStringProperty("drive_letter") ?? disk.GetStringProperty("driveLetter") ?? "C:";
-                var totalBytes = disk.GetInt64Property("totalSizeBytes") ?? disk.GetInt64Property("total_size_bytes");
-                var freeBytes = disk.GetInt64Property("freeSpaceBytes") ?? disk.GetInt64Property("free_space_bytes");
-                var usedBytes = disk.GetInt64Property("usedSpaceBytes") ?? disk.GetInt64Property("used_space_bytes");
-                var usagePercent = disk.GetDecimalProperty("usagePercentage") ?? disk.GetDecimalProperty("usage_percentage");
+                var disksProp = payload.GetPropertyOrNull("disks");
+                if (disksProp == null || disksProp.Value.ValueKind != JsonValueKind.Array) return;
 
-                if (usagePercent == null && totalBytes.HasValue && totalBytes.Value > 0 && usedBytes.HasValue)
-                {
-                    usagePercent = Math.Round((decimal)usedBytes.Value / totalBytes.Value * 100, 2);
-                }
+                var disks = disksProp.Value;
 
-                if (usagePercent.HasValue)
-                {
-                    aggregateUsage = aggregateUsage.HasValue ? Math.Max(aggregateUsage.Value, usagePercent.Value) : usagePercent.Value;
-                }
-                if (freeBytes.HasValue)
-                {
-                    aggregateFree = (aggregateFree ?? 0) + freeBytes.Value;
-                }
-                if (totalBytes.HasValue)
-                {
-                    aggregateTotal = (aggregateTotal ?? 0) + totalBytes.Value;
-                }
-                if (usedBytes.HasValue)
-                {
-                    aggregateUsed = (aggregateUsed ?? 0) + usedBytes.Value;
-                }
+                decimal? aggregateUsage = null;
+                long? aggregateFree = null;
+                long? aggregateTotal = null;
+                long? aggregateUsed = null;
+                bool? aggregateHealth = null;
 
-                var driveType = disk.GetStringProperty("driveType") ?? disk.GetStringProperty("drive_type");
-                var fileSystem = disk.GetStringProperty("fileSystem") ?? disk.GetStringProperty("file_system");
-                var smartOk = disk.GetBooleanProperty("isSmartHealthOk") ?? disk.GetBooleanProperty("is_smart_health_ok");
-                var healthStatus = smartOk.HasValue ? (smartOk.Value ? "Good" : "Bad") : "Unknown";
-                var volumeLabel = disk.GetStringProperty("volumeLabel") ?? disk.GetStringProperty("volume_label");
-
-                if (smartOk.HasValue)
+                foreach (var disk in disks.EnumerateArray())
                 {
-                    if (aggregateHealth == null) aggregateHealth = smartOk.Value;
-                    else if (!smartOk.Value) aggregateHealth = false;
-                }
+                    var driveLetter = disk.GetStringProperty("driveName") ?? disk.GetStringProperty("drive_letter") ?? disk.GetStringProperty("driveLetter") ?? "C:";
+                    var totalBytes = disk.GetInt64Property("totalSizeBytes") ?? disk.GetInt64Property("total_size_bytes");
+                    var freeBytes = disk.GetInt64Property("freeSpaceBytes") ?? disk.GetInt64Property("free_space_bytes");
+                    var usedBytes = disk.GetInt64Property("usedSpaceBytes") ?? disk.GetInt64Property("used_space_bytes");
+                    var usagePercent = disk.GetDecimalProperty("usagePercentage") ?? disk.GetDecimalProperty("usage_percentage");
 
-                // In-memory lookup to avoid N+1 queries.
-                var dbDisk = existingDisks.FirstOrDefault(d => d.DriveLetter == driveLetter);
+                    if (usagePercent == null && totalBytes.HasValue && totalBytes.Value > 0 && usedBytes.HasValue)
+                    {
+                        usagePercent = Math.Round((decimal)usedBytes.Value / totalBytes.Value * 100, 2);
+                    }
+
+                    if (usagePercent.HasValue)
+                    {
+                        aggregateUsage = aggregateUsage.HasValue ? Math.Max(aggregateUsage.Value, usagePercent.Value) : usagePercent.Value;
+                    }
+                    if (freeBytes.HasValue)
+                    {
+                        aggregateFree = (aggregateFree ?? 0) + freeBytes.Value;
+                    }
+                    if (totalBytes.HasValue)
+                    {
+                        aggregateTotal = (aggregateTotal ?? 0) + totalBytes.Value;
+                    }
+                    if (usedBytes.HasValue)
+                    {
+                        aggregateUsed = (aggregateUsed ?? 0) + usedBytes.Value;
+                    }
+
+                    var driveType = disk.GetStringProperty("driveType") ?? disk.GetStringProperty("drive_type");
+                    var fileSystem = disk.GetStringProperty("fileSystem") ?? disk.GetStringProperty("file_system");
+                    var smartOk = disk.GetBooleanProperty("isSmartHealthOk") ?? disk.GetBooleanProperty("is_smart_health_ok");
+                    var healthStatus = smartOk.HasValue ? (smartOk.Value ? "Good" : "Bad") : "Unknown";
+                    var volumeLabel = disk.GetStringProperty("volumeLabel") ?? disk.GetStringProperty("volume_label");
+
+                    if (smartOk.HasValue)
+                    {
+                        if (aggregateHealth == null) aggregateHealth = smartOk.Value;
+                        else if (!smartOk.Value) aggregateHealth = false;
+                    }
+
+                    // Replicate MachineDisk upsert logic
+                    var dbDisk = await _dbContext.MachineDisks
+                        .FirstOrDefaultAsync(d => d.MachineId == machine.Id && d.DriveLetter == driveLetter);
 
                     if (dbDisk == null)
                     {
@@ -126,6 +124,11 @@ namespace DeskGuardBackend.Services.PayloadProcessors
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogDebug("DiskProcessor: Processed disk telemetry for machine {MachineId}", machine.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DiskProcessor: Failed to process disk metrics for machine {MachineId}", machine.Id);
+            }
         }
     }
 }

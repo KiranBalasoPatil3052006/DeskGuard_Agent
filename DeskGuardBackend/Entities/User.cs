@@ -24,7 +24,6 @@ namespace DeskGuardBackend.Entities
         public string? Email { get; set; }
 
         /// <summary>BCrypt-hashed password.</summary>
-        [System.Text.Json.Serialization.JsonIgnore]
         public string? Password { get; set; }
 
         /// <summary>Whether mobile number has been verified via OTP.</summary>
@@ -56,15 +55,6 @@ namespace DeskGuardBackend.Entities
 
         /// <summary>Activation token for agent registration flow.</summary>
         public string? ActivationToken { get; set; }
-
-        /// <summary>Employee ID in EMP-XXXX format (unique, for admin accounts).</summary>
-        public string? EmployeeId { get; set; }
-
-        /// <summary>FK to the User who created this account (for admin accounts).</summary>
-        public long? CreatedByUserId { get; set; }
-
-        /// <summary>Creator of this account (navigation).</summary>
-        public User? CreatedBy { get; set; }
 
         // Navigation properties
         /// <summary>Company this user belongs to.</summary>
